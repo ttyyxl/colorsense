@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+mediapipe
+opencv-python-headless
+pillow
+numpy
+scikit-learn
+onnxruntime
