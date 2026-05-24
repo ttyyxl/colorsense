@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 const steps = ["正在检测人脸轮廓", "分析肤色特征", "匹配色彩季型", "生成专属建议"];
 
 export default function ProcessingPage() {
@@ -15,9 +13,7 @@ export default function ProcessingPage() {
             </div>
           ))}
         </div>
-        <Link href="/result/demo" className="mt-8 inline-flex rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white">
-          查看示例结果
-        </Link>
+        <p className="mt-8 text-sm leading-6 text-slate-500">现在上传页会直接提交诊断并在完成后跳转结果页；这个页面保留给之后的异步队列版本。</p>
       </section>
     </main>
   );

@@ -8,15 +8,17 @@ export interface LabFeatures {
 
 export interface Diagnosis {
   id: string;
-  user_id: string;
+  user_id?: string;
   created_at: string;
-  image_url: string;
+  image_url?: string;
+  image_name?: string;
   season_type: SeasonType;
   confidence: number;
   color_palette: string[];
   style_keywords: string[];
   ai_description: string;
   lab_features: LabFeatures;
+  scores?: Partial<Record<SeasonType, number>>;
 }
 
 export interface ApiSuccess<T> {

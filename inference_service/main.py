@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from face_detector import detect_face_and_extract_skin
 from season_classifier import classify_season
 
 
@@ -26,8 +27,8 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/diagnose")
-def diagnose(features: LabFeatures) -> dict[str, object]:
+@app.post("/diagnose-lab")
+def diagnose_lab(features: LabFeatures) -> dict[str, object]:
     if not 0 <= features.L <= 100:
         raise HTTPException(status_code=400, detail="L 明度必须在 0-100 之间")
 
@@ -38,4 +39,31 @@ def diagnose(features: LabFeatures) -> dict[str, object]:
         "confidence": result["confidence"],
         "scores": result["scores"],
         "lab_features": features.model_dump(),
+    }
+
+
+@app.post("/diagnose")
+async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
+    if image.content_type not in {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}:
+        raise HTTPException(status_code=400, detail="仅支持 JPG、PNG、HEIC 或 WebP 图片")
+
+    image_bytes = await image.read()
+
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="图片不能超过 10MB")
+
+    face_result = detect_face_and_extract_skin(image_bytes)
+
+    if not face_result["success"]:
+        raise HTTPException(status_code=422, detail=face_result["error"])
+
+    lab_features = face_result["lab_mean"]
+    result = classify_season(lab_features)
+
+    return {
+        "season": result["season"],
+        "confidence": result["confidence"],
+        "scores": result["scores"],
+        "lab_features": lab_features,
+        "face_confidence": face_result["face_confidence"],
     }

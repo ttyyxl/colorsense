@@ -56,15 +56,25 @@ uvicorn main:app --reload
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_DIAGNOSIS_BUCKET=diagnosis-images
 ANTHROPIC_API_KEY=
 INFERENCE_SERVICE_URL=http://localhost:8000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+## Supabase 初始化
+
+1. 在 Supabase 新建项目。
+2. 打开 SQL Editor。
+3. 复制 `supabase/schema.sql` 并执行。
+4. 在项目设置里复制 `Project URL`、`anon public key`、`service_role key` 到 `.env.local`。
+
+如果没有配置 Supabase 环境变量，项目会自动使用本地内存存储，方便开发；配置完成后，诊断图片会进入 `diagnosis-images` bucket，诊断结果会写入 `diagnoses` 表。
+
 ## 下一步
 
 1. 接入 Supabase Auth。
-2. 完成照片上传到 Supabase Storage。
-3. 将 `/api/diagnose` 连接 FastAPI 服务。
-4. 接入 Claude API 生成中文风格文案。
-5. 完成分享卡片下载和历史记录 CRUD。
+2. 将诊断记录按真实用户隔离。
+3. 接入 Claude API 生成中文风格文案。
+4. 将 Kaggle 训练得到的 ONNX 模型接入 Python 推理服务。
+5. 完成部署环境变量配置。

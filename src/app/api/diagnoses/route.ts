@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { SEASONS } from "@/lib/seasons";
+import { listDiagnoses } from "@/lib/diagnosis-store";
+import { selectDiagnoses } from "@/lib/supabase-diagnoses";
+import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export async function GET() {
-  const season = SEASONS.spring;
+  const data = isSupabaseAdminConfigured() ? await selectDiagnoses() : listDiagnoses();
 
   return NextResponse.json({
     success: true,
-    data: [
-      {
-        id: "demo",
-        season: "spring",
-        created_at: new Date().toISOString(),
-        thumbnail: season.palette,
-      },
-    ],
+    data,
   });
 }
