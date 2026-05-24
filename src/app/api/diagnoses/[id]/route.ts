@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDiagnosis } from "@/lib/diagnosis-store";
+import { selectDiagnosis } from "@/lib/supabase-diagnoses";
+import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 interface RouteContext {
   params: { id: string };
@@ -7,7 +9,7 @@ interface RouteContext {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = context.params;
-  const diagnosis = getDiagnosis(id);
+  const diagnosis = isSupabaseAdminConfigured() ? await selectDiagnosis(id) : getDiagnosis(id);
 
   if (!diagnosis) {
     return NextResponse.json({ success: false, error: "没有找到这次诊断记录，请重新上传照片。" }, { status: 404 });

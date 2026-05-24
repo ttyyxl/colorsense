@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
 import { saveDiagnosis } from "@/lib/diagnosis-store";
+import { insertDiagnosis, uploadDiagnosisImage } from "@/lib/supabase-diagnoses";
+import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -87,10 +89,17 @@ export async function POST(request: Request) {
   const inference = await runInference(image);
   const season = SEASONS[inference.season] ?? SEASONS.spring;
   const id = crypto.randomUUID();
+  let imageUrl: string | undefined;
 
-  const diagnosis = saveDiagnosis({
+  if (isSupabaseAdminConfigured()) {
+    const upload = await uploadDiagnosisImage(image, id);
+    imageUrl = upload.publicUrl;
+  }
+
+  const diagnosisInput = {
     id,
     created_at: new Date().toISOString(),
+    image_url: imageUrl,
     image_name: image.name,
     season_type: inference.season,
     confidence: inference.confidence,
@@ -99,7 +108,9 @@ export async function POST(request: Request) {
     ai_description: season.styleDesc,
     lab_features: inference.lab_features ?? { L: 65, a: 8, b: 12 },
     scores: inference.scores,
-  });
+  };
+
+  const diagnosis = isSupabaseAdminConfigured() ? await insertDiagnosis(diagnosisInput) : saveDiagnosis(diagnosisInput);
 
   return NextResponse.json({
     success: true,
