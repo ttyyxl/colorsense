@@ -90,10 +90,16 @@ export async function POST(request: Request) {
   const season = SEASONS[inference.season] ?? SEASONS.spring;
   const id = crypto.randomUUID();
   let imageUrl: string | undefined;
+  let shouldPersistToSupabase = isSupabaseAdminConfigured();
 
-  if (isSupabaseAdminConfigured()) {
-    const upload = await uploadDiagnosisImage(image, id);
-    imageUrl = upload.publicUrl;
+  if (shouldPersistToSupabase) {
+    try {
+      const upload = await uploadDiagnosisImage(image, id);
+      imageUrl = upload.publicUrl;
+    } catch (error) {
+      console.error("Supabase image upload failed, falling back to memory store.", error);
+      shouldPersistToSupabase = false;
+    }
   }
 
   const diagnosisInput = {
@@ -110,7 +116,10 @@ export async function POST(request: Request) {
     scores: inference.scores,
   };
 
-  const diagnosis = isSupabaseAdminConfigured() ? await insertDiagnosis(diagnosisInput) : saveDiagnosis(diagnosisInput);
+  const diagnosis = shouldPersistToSupabase ? await insertDiagnosis(diagnosisInput).catch((error) => {
+    console.error("Supabase diagnosis insert failed, falling back to memory store.", error);
+    return saveDiagnosis(diagnosisInput);
+  }) : saveDiagnosis(diagnosisInput);
 
   return NextResponse.json({
     success: true,
