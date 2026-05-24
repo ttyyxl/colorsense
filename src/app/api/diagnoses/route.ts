@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
-import { SEASONS } from "@/lib/seasons";
+import { listDiagnoses } from "@/lib/diagnosis-store";
 
 export async function GET() {
-  const season = SEASONS.spring;
-
   return NextResponse.json({
     success: true,
-    data: [
-      {
-        id: "demo",
-        season: "spring",
-        created_at: new Date().toISOString(),
-        thumbnail: season.palette,
-      },
-    ],
+    data: listDiagnoses(),
   });
 }
