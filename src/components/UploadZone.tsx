@@ -3,12 +3,16 @@
 import { Camera, Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { createDiagnosis } from "@/lib/firestore-diagnoses";
+import { useAuth } from "@/lib/useAuth";
+import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 export function UploadZone() {
   const router = useRouter();
+  const { currentUser } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -60,13 +64,18 @@ export function UploadZone() {
         body: formData,
       });
 
-      const payload = await response.json();
+      const payload = (await response.json()) as ApiResponse<NewDiagnosis>;
 
       if (!response.ok || !payload.success) {
-        throw new Error(payload.error ?? "诊断失败，请稍后重试。");
+        throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
       }
 
-      router.push(`/result/${payload.data.diagnosis_id}`);
+      if (!currentUser) {
+        throw new Error("登录已过期，请重新登录。");
+      }
+
+      const diagnosisId = await createDiagnosis(currentUser.uid, payload.data);
+      router.push(`/result/${diagnosisId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "诊断失败，请稍后重试。");
       setIsSubmitting(false);

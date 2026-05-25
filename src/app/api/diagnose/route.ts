@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
-import { saveDiagnosis } from "@/lib/diagnosis-store";
-import { insertDiagnosis, uploadDiagnosisImage } from "@/lib/supabase-diagnoses";
-import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -13,6 +10,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/h
 interface InferenceResponse {
   season: SeasonType;
   confidence: number;
+  source?: "fastapi" | "mock";
   scores?: Partial<Record<SeasonType, number>>;
   lab_features?: {
     L: number;
@@ -29,6 +27,7 @@ function pickFallbackSeason(file: File): InferenceResponse {
   return {
     season,
     confidence: 0.72,
+    source: "mock",
     scores: {
       spring: season === "spring" ? 0.72 : 0.09,
       summer: season === "summer" ? 0.72 : 0.09,
@@ -64,7 +63,7 @@ async function runInference(file: File): Promise<InferenceResponse> {
       return pickFallbackSeason(file);
     }
 
-    return (await response.json()) as InferenceResponse;
+    return { ...((await response.json()) as InferenceResponse), source: "fastapi" };
   } catch {
     return pickFallbackSeason(file);
   }
@@ -88,48 +87,20 @@ export async function POST(request: Request) {
 
   const inference = await runInference(image);
   const season = SEASONS[inference.season] ?? SEASONS.spring;
-  const id = crypto.randomUUID();
-  let imageUrl: string | undefined;
-  let shouldPersistToSupabase = isSupabaseAdminConfigured();
-
-  if (shouldPersistToSupabase) {
-    try {
-      const upload = await uploadDiagnosisImage(image, id);
-      imageUrl = upload.publicUrl;
-    } catch (error) {
-      console.error("Supabase image upload failed, falling back to memory store.", error);
-      shouldPersistToSupabase = false;
-    }
-  }
-
-  const diagnosisInput = {
-    id,
-    created_at: new Date().toISOString(),
-    image_url: imageUrl,
-    image_name: image.name,
-    season_type: inference.season,
+  const diagnosis = {
+    seasonType: inference.season,
     confidence: inference.confidence,
-    color_palette: season.palette,
-    style_keywords: season.keywords,
-    ai_description: season.styleDesc,
-    lab_features: inference.lab_features ?? { L: 65, a: 8, b: 12 },
+    colorPalette: season.palette,
+    styleKeywords: season.keywords,
+    avoidColors: season.avoid,
+    aiDescription: season.styleDesc,
+    labFeatures: inference.lab_features ?? { L: 65, a: 8, b: 12 },
+    source: inference.source ?? "mock",
     scores: inference.scores,
   };
 
-  const diagnosis = shouldPersistToSupabase ? await insertDiagnosis(diagnosisInput).catch((error) => {
-    console.error("Supabase diagnosis insert failed, falling back to memory store.", error);
-    return saveDiagnosis(diagnosisInput);
-  }) : saveDiagnosis(diagnosisInput);
-
   return NextResponse.json({
     success: true,
-    data: {
-      diagnosis_id: diagnosis.id,
-      season: diagnosis.season_type,
-      confidence: diagnosis.confidence,
-      palette: diagnosis.color_palette,
-      keywords: diagnosis.style_keywords,
-      ai_description: diagnosis.ai_description,
-    },
+    data: diagnosis,
   });
 }

@@ -1,4 +1,23 @@
+-- Deprecated legacy schema. The active application stores diagnoses in Cloud Firestore.
 create extension if not exists "pgcrypto";
+
+create table if not exists public.email_verification_codes (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  used boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists email_verification_codes_email_created_idx
+on public.email_verification_codes (email, created_at desc);
+
+create unique index if not exists email_verification_codes_one_active_idx
+on public.email_verification_codes (email)
+where used = false;
+
+alter table public.email_verification_codes enable row level security;
 
 create table if not exists public.diagnoses (
   id uuid primary key default gen_random_uuid(),

@@ -1,11 +1,12 @@
 import { Navbar } from "@/components/Navbar";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { UploadZone } from "@/components/UploadZone";
 
 const tips = ["正面直视镜头", "自然光或均匀灯光", "不要戴墨镜或口罩", "文件大小不超过 10MB"];
 
 export default function UploadPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
+    <ProtectedRoute><main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
       <Navbar />
       <section className="mx-auto max-w-4xl px-6 py-12">
         <p className="text-sm font-semibold text-indigo-700">P03 上传页</p>
@@ -22,6 +23,6 @@ export default function UploadPage() {
           ))}
         </div>
       </section>
-    </main>
+    </main></ProtectedRoute>
   );
 }

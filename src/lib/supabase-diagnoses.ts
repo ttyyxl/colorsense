@@ -1,6 +1,21 @@
 import type { SeasonType } from "./seasons";
 import { DIAGNOSIS_BUCKET, createSupabaseAdmin } from "./supabase-admin";
-import type { Diagnosis } from "./types";
+
+// Deprecated legacy persistence retained only for migration reference.
+interface LegacyDiagnosis {
+  id: string;
+  user_id?: string;
+  created_at: string;
+  image_url?: string;
+  image_name?: string;
+  season_type: SeasonType;
+  confidence: number;
+  lab_features: { L: number; a: number; b: number };
+  color_palette: string[];
+  style_keywords: string[];
+  ai_description: string;
+  scores?: Partial<Record<SeasonType, number>>;
+}
 
 type DiagnosisRow = {
   id: string;
@@ -10,19 +25,19 @@ type DiagnosisRow = {
   image_name: string | null;
   season_type: SeasonType;
   confidence: number;
-  lab_features: Diagnosis["lab_features"];
+  lab_features: LegacyDiagnosis["lab_features"];
   color_palette: string[];
   style_keywords: string[];
   ai_description: string;
-  scores: Diagnosis["scores"] | null;
+  scores: LegacyDiagnosis["scores"] | null;
 };
 
-export type NewDiagnosisInput = Omit<Diagnosis, "id" | "created_at"> & {
+export type NewDiagnosisInput = Omit<LegacyDiagnosis, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
 
-function toDiagnosis(row: DiagnosisRow): Diagnosis {
+function toDiagnosis(row: DiagnosisRow): LegacyDiagnosis {
   return {
     id: row.id,
     user_id: row.user_id ?? undefined,

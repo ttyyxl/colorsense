@@ -1,3 +1,4 @@
+// Deprecated: retained for migration reference; diagnoses now persist in Cloud Firestore.
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 export const DIAGNOSIS_BUCKET = process.env.SUPABASE_DIAGNOSIS_BUCKET ?? "diagnosis-images";

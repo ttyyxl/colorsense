@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { ColorPalette } from "@/components/ColorPalette";
 import { Navbar } from "@/components/Navbar";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SeasonCard } from "@/components/SeasonCard";
 import { ShareModal } from "@/components/ShareModal";
+import { getUserDiagnosis } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
+import { useAuth } from "@/lib/useAuth";
 import { useEffect, useState } from "react";
 
 interface ResultPageProps {
@@ -15,24 +18,26 @@ interface ResultPageProps {
 
 export default function ResultPage({ params }: ResultPageProps) {
   const { id } = params;
+  const { currentUser } = useAuth();
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [error, setError] = useState("");
-  const season = diagnosis ? SEASONS[diagnosis.season_type] : null;
+  const season = diagnosis ? SEASONS[diagnosis.seasonType] : null;
 
   useEffect(() => {
     let ignore = false;
 
     async function loadDiagnosis() {
+      if (!currentUser) {
+        return;
+      }
       try {
-        const response = await fetch(`/api/diagnoses/${id}`, { cache: "no-store" });
-        const payload = await response.json();
+        const payload = await getUserDiagnosis(id, currentUser.uid);
 
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.error ?? "没有找到诊断结果。");
+        if (!payload) {
+          throw new Error("没有找到这次诊断记录，或你无权查看该记录。");
         }
-
         if (!ignore) {
-          setDiagnosis(payload.data);
+          setDiagnosis(payload);
         }
       } catch (err) {
         if (!ignore) {
@@ -46,10 +51,10 @@ export default function ResultPage({ params }: ResultPageProps) {
     return () => {
       ignore = true;
     };
-  }, [id]);
+  }, [currentUser, id]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
+    <ProtectedRoute><main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
       <Navbar />
       <section className="mx-auto max-w-4xl px-6 py-10">
         <p className="text-sm font-semibold text-indigo-700">P05 结果页 · {id}</p>
@@ -72,20 +77,21 @@ export default function ResultPage({ params }: ResultPageProps) {
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-xl font-bold text-slate-950">推荐穿搭色系</h2>
                 <div className="mt-5">
-                  <ColorPalette colors={diagnosis.color_palette} />
+                  <ColorPalette colors={diagnosis.colorPalette} />
                 </div>
               </section>
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-xl font-bold text-slate-950">风格建议</h2>
-                <p className="mt-4 leading-8 text-slate-600">{diagnosis.ai_description}</p>
+                <p className="mt-4 leading-8 text-slate-600">{diagnosis.aiDescription}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {diagnosis.style_keywords.map((keyword) => (
+                  {diagnosis.styleKeywords.map((keyword) => (
                     <span key={keyword} className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700">
                       {keyword}
                     </span>
                   ))}
                 </div>
-                <p className="mt-5 text-sm text-slate-500">谨慎使用：{season.avoid.join(" / ")}</p>
+                <p className="mt-5 text-sm text-slate-500">谨慎使用：{diagnosis.avoidColors.join(" / ")}</p>
+                <p className="mt-3 text-sm text-slate-500">生成时间：{new Date(diagnosis.createdAt).toLocaleString("zh-CN")}</p>
               </section>
             </div>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
@@ -100,6 +106,6 @@ export default function ResultPage({ params }: ResultPageProps) {
           </>
         )}
       </section>
-    </main>
+    </main></ProtectedRoute>
   );
 }

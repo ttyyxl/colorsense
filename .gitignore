@@ -35,6 +35,7 @@ yarn-error.log*
 !.env.example
 
 # python
+venv/
 __pycache__/
 *.py[cod]
 

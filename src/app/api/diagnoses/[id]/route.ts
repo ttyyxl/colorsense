@@ -1,19 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDiagnosis } from "@/lib/diagnosis-store";
-import { selectDiagnosis } from "@/lib/supabase-diagnoses";
-import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
-interface RouteContext {
-  params: { id: string };
-}
-
-export async function GET(_request: Request, context: RouteContext) {
-  const { id } = context.params;
-  const diagnosis = isSupabaseAdminConfigured() ? await selectDiagnosis(id) : getDiagnosis(id);
-
-  if (!diagnosis) {
-    return NextResponse.json({ success: false, error: "没有找到这次诊断记录，请重新上传照片。" }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true, data: diagnosis });
+export function GET() {
+  return NextResponse.json({ success: false, error: "该接口已废弃，诊断结果现由 Firestore 提供。" }, { status: 410 });
 }

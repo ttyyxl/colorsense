@@ -1,13 +1,5 @@
 import { NextResponse } from "next/server";
-import { listDiagnoses } from "@/lib/diagnosis-store";
-import { selectDiagnoses } from "@/lib/supabase-diagnoses";
-import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
-export async function GET() {
-  const data = isSupabaseAdminConfigured() ? await selectDiagnoses() : listDiagnoses();
-
-  return NextResponse.json({
-    success: true,
-    data,
-  });
+export function GET() {
+  return NextResponse.json({ success: false, error: "该接口已废弃，历史记录现由 Firestore 提供。" }, { status: 410 });
 }

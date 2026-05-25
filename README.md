@@ -1,34 +1,64 @@
 # ColorSense
 
-ColorSense 是面向中文用户的 AI 四季色彩诊断 Web App。用户上传正面照后，系统分析肤色特征，判断春 / 夏 / 秋 / 冬四季型，并输出色卡和风格建议。
+ColorSense 是基于 Next.js 的 AI 四季色彩诊断 Web App。
 
-## 当前阶段
+## 技术路线
 
-本仓库目前完成阶段一 MVP 骨架：
+- 前端：Next.js 14、TypeScript、Tailwind CSS
+- 认证：Firebase Authentication，支持邮箱密码注册、邮箱验证、邮箱登录、Google 登录和退出
+- 数据：Cloud Firestore，保存当前用户的诊断结果与历史记录
+- 推理：FastAPI 服务；不可用时前端 API 使用 mock fallback 以便本地调试
+- 导出：结果页使用 `html2canvas` 下载 PNG，不发送邮件
 
-- Next.js App Router 页面结构
-- 首页、登录、上传、处理、结果、历史页面占位
-- 四季型基础数据与 TypeScript 类型
-- API Route 占位返回统一 JSON
-- FastAPI 推理服务骨架
-- 环境变量模板
+旧 Supabase、Resend、SMTP 和六位验证码文件仅作为迁移参考保留，当前页面和诊断流程不再调用这些服务。
 
-## 目录结构
+## 环境变量
+
+在项目根目录创建 `.env.local`，填写 Firebase Web App 配置：
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+INFERENCE_SERVICE_URL=http://localhost:8000
+```
+
+不要提交 `.env.local`。
+
+## Firebase 配置
+
+1. 在 Firebase Console 创建项目，并添加 Web App。
+2. 将 Web App 的 `firebaseConfig` 六项写入 `.env.local`。
+3. 打开 `Authentication -> Sign-in method`，启用 `Email/Password`。
+4. 在同一页面启用 `Google`，配置项目支持邮箱。
+5. 打开 `Firestore Database`，创建数据库。
+6. 将 [firestore.rules](./firestore.rules) 内容发布为 Firestore Security Rules。
+
+邮箱注册成功后，Firebase 自动发送验证邮件。邮箱密码用户仅在点击验证链接后才能进入受保护页面；Google 登录用户可直接进入。
+
+## Firestore 数据结构
+
+集合为 `diagnoses/{diagnosisId}`，字段包括：
 
 ```text
-src/
-  app/
-    page.tsx
-    auth/page.tsx
-    upload/page.tsx
-    processing/page.tsx
-    result/[id]/page.tsx
-    history/page.tsx
-    api/
-  components/
-  lib/
-inference_service/
+userId
+createdAt
+seasonType
+confidence
+labFeatures
+aiDescription
+colorPalette
+styleKeywords
+avoidColors
+source
+scores
 ```
+
+安全规则限制已完成邮箱验证的用户或 Google 登录用户只能创建、读取和删除自己的记录。历史页按当前 `userId` 查询并在界面中按 `createdAt` 倒序展示。
 
 ## 本地运行
 
@@ -39,7 +69,7 @@ npm install
 npm run dev
 ```
 
-Python 推理服务：
+推理服务：
 
 ```bash
 cd inference_service
@@ -48,33 +78,15 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-## 环境变量
+未启动 FastAPI 或未填写 `INFERENCE_SERVICE_URL` 时，`/api/diagnose` 会返回 mock 诊断结果，并将 `source` 标记为 `mock`。
 
-复制 `.env.local` 并填入真实服务配置：
+## 测试流程
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_DIAGNOSIS_BUCKET=diagnosis-images
-ANTHROPIC_API_KEY=
-INFERENCE_SERVICE_URL=http://localhost:8000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-## Supabase 初始化
-
-1. 在 Supabase 新建项目。
-2. 打开 SQL Editor。
-3. 复制 `supabase/schema.sql` 并执行。
-4. 在项目设置里复制 `Project URL`、`anon public key`、`service_role key` 到 `.env.local`。
-
-如果没有配置 Supabase 环境变量，项目会自动使用本地内存存储，方便开发；配置完成后，诊断图片会进入 `diagnosis-images` bucket，诊断结果会写入 `diagnoses` 表。
-
-## 下一步
-
-1. 接入 Supabase Auth。
-2. 将诊断记录按真实用户隔离。
-3. 接入 Claude API 生成中文风格文案。
-4. 将 Kaggle 训练得到的 ONNX 模型接入 Python 推理服务。
-5. 完成部署环境变量配置。
+1. 访问 `http://localhost:3000/login`。
+2. 输入邮箱和密码点击“邮箱注册”，打开 Firebase 验证邮件并完成验证。
+3. 返回登录页使用邮箱密码登录，确认跳转至 `/upload`。
+4. 点击“使用 Google 登录”，确认 Google 用户也可进入 `/upload`。
+5. 上传图片开始诊断，确认结果页展示季型、置信度、色卡、避免色、风格建议和生成时间。
+6. 在结果页点击“下载 PNG”，确认结果卡片保存到本地。
+7. 访问 `/history`，确认仅显示当前用户记录，并可删除自己的记录。
+8. 退出登录后直接访问 `/upload`、`/processing`、`/result` 或 `/history`，确认跳转登录页。

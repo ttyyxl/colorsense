@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function canUseDiagnosisFeatures() {
+      return request.auth != null
+        && (request.auth.token.email_verified == true
+          || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    match /diagnoses/{diagnosisId} {
+      allow create: if canUseDiagnosisFeatures()
+        && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if canUseDiagnosisFeatures()
+        && resource.data.userId == request.auth.uid;
+    }
+  }
+}
