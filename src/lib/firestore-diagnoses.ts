@@ -10,8 +10,10 @@ function getDiagnosesCollection() {
 }
 
 export async function createDiagnosis(userId: string, input: NewDiagnosis) {
+  const { scores, ...requiredFields } = input;
   const ref = await addDoc(getDiagnosesCollection(), {
-    ...input,
+    ...requiredFields,
+    ...(scores === undefined ? {} : { scores }),
     userId,
     createdAt: serverTimestamp(),
   });

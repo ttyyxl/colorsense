@@ -31,10 +31,12 @@
 
 - 继续保留 FastAPI 推理服务
 - Next.js 的 `/api/diagnose` 接收图片并调用 FastAPI
-- FastAPI 返回 `season`、`confidence`、`lab_features` 等推理结果
+- 当前 FastAPI 使用现有 `face_detector` 与 `season_classifier` 流程，返回 `season`、`confidence`、`lab_features` 等推理结果
 - Next.js 结合 `src/lib/seasons.ts` 生成完整的色卡、关键词、避免色和基础风格建议
 - 前端将完整诊断结果写入 Firestore
 - FastAPI 不可用或未配置时，当前 API 保留 mock fallback，并在数据中以 `source: "mock"` 标记
+- 计划在 Kaggle 上使用 Deep-Armocromia 数据集，以 EfficientNet-B0 进行春、夏、秋、冬四分类迁移学习训练
+- 训练完成后将导出的模型下载到本地，并接入本地 FastAPI 推理服务供 Next.js 调用；该模型接入尚未实现
 
 ### 图片与结果导出
 
@@ -50,7 +52,7 @@
 - 新增 `src/lib/firebase.ts`，初始化 Firebase App，并提供 Auth 与 Firestore 实例。
 - 新增 `src/components/AuthProvider.tsx` 与 `src/lib/useAuth.ts`，维护 `currentUser`、`loading`、`isAuthenticated`、`logout`。
 - 新增 `src/components/ProtectedRoute.tsx`，保护 `/upload`、`/processing`、`/result`、`/history`。
-- 登录页已改为 Firebase 邮箱注册、邮箱验证、邮箱登录和 Google 登录流程。
+- 登录页已改为 Firebase 邮箱注册、邮箱验证、邮箱登录和 Google 登录流程；验证邮件使用 `/login?verified=1` 回跳，保留同浏览器 session 时可在验证完成后自动进入 `/upload`。
 - 导航栏已切换为 Firebase 退出登录。
 - 新增 `src/lib/firestore-diagnoses.ts`，实现诊断记录写入、查询、详情读取和删除。
 - `/api/diagnose` 已停止写入 Supabase/上传云端图片，只负责 FastAPI 推理或 mock fallback。
@@ -84,6 +86,7 @@
 代码状态说明：
 
 - 旧 Supabase、Resend、SMTP 和验证码相关文件为避免删除风险而保留，并已标记或视为 deprecated。
+- 相关旧依赖目前也可能仍保留在 `package.json` 中，属于待清理遗留内容，不代表当前主流程仍在使用。
 - 旧 `/api/auth/*`、`/api/email-result` 和 `/api/diagnoses/*` 接口不再执行旧功能，只返回废弃提示。
 - 不要在新开发中重新连接这些旧方案。
 
@@ -109,11 +112,20 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 INFERENCE_SERVICE_URL=http://localhost:8000
 ```
 
 不要提交 `.env.local`。
+
+Firebase 邮箱验证流程使用 `NEXT_PUBLIC_APP_URL` 生成验证完成后的回跳地址：
+
+```text
+${NEXT_PUBLIC_APP_URL}/login?verified=1
+```
+
+本地开发时需在 Firebase Authentication 的 Authorized domains 中允许 `localhost`。
 
 ## 6. Firestore 数据结构
 
@@ -154,8 +166,9 @@ scores
 ### 认证页面
 
 - 页面：`/login`，兼容入口 `/auth` 和 `/register` 会跳转到登录页。
-- 状态：已实现邮箱注册、Firebase 验证邮件、邮箱登录、Google 登录、中文错误提示和 loading 状态。
+- 状态：已实现邮箱注册、Firebase 验证邮件、`/login?verified=1` 验证回跳状态检查、邮箱登录、Google 登录、中文错误提示和 loading 状态。
 - 规则：邮箱登录用户必须验证邮箱后才能进入上传与诊断流程。
+- 回跳行为：同浏览器仍有 Firebase session 且验证状态刷新成功时自动进入 `/upload`；没有 session 时提示用户使用邮箱和密码登录。
 
 ### 登录状态管理
 
@@ -187,21 +200,39 @@ scores
 - 展示：诊断时间、季型、置信度、色卡缩略图。
 - 支持进入详情页和删除本人记录。
 
-## 8. 下次 CLI 启动时的工作方式
+## 8. 后端模型训练与接入计划
+
+当前状态：
+
+- FastAPI 服务已存在，并可被 Next.js `/api/diagnose` 调用。
+- 仓库当前尚未包含 Deep-Armocromia 数据集训练 notebook、EfficientNet-B0 训练产物或对应模型加载逻辑。
+
+计划路线：
+
+1. 在 Kaggle Notebook 环境获取并整理 Deep-Armocromia 数据集。
+2. 使用 EfficientNet-B0 作为预训练骨干网络，进行 `spring`、`summer`、`autumn`、`winter` 四分类迁移学习训练。
+3. 在 Kaggle 中完成训练集/验证集评估、权重保存与可复现实验记录。
+4. 导出训练完成的模型文件并下载到本地项目的推理服务部署位置。
+5. 修改 FastAPI 推理逻辑加载导出模型，以图片输入返回四季分类结果与置信度。
+6. 通过 Next.js `/api/diagnose` 联调真实模型推理，并在保留 fallback 策略的前提下验证前端结果展示。
+
+## 9. 下次 CLI 启动时的工作方式
 
 - 每次开始工作前，先读取项目根目录的 `MEMORY.md` 和 `README.md`。
 - 以 Firebase Auth + Firestore + FastAPI + 本地 PNG 下载作为唯一当前技术路线。
 - 不要重新使用 Supabase、Resend、SMTP 或手机号验证。
+- 将 Deep-Armocromia + EfficientNet-B0 视为待实施的模型训练方案，在训练产物实际接入 FastAPI 前不要写成已完成能力。
 - 如果发现代码与 `MEMORY.md` 不一致，先指出差异，再询问是否需要按 `MEMORY.md` 修正。
 - 当前工作区可能包含尚未提交的技术路线改造文件；不要回退用户已有修改。
 
-## 9. 当前下一步任务
+## 10. 当前下一步任务
 
 Firebase 和 Firestore 主流程代码已经完成替换，下一步应优先进行真实 Firebase 联调：
 
 1. 用户在 Firebase Console 完成 Authentication、Google Provider、Firestore 与 Security Rules 配置。
-2. 用户在 `.env.local` 填入真实 Firebase Web App 配置，并重启开发服务器。
-3. 实测邮箱注册、邮箱验证后登录、Google 登录与退出。
+2. 用户在 `.env.local` 填入真实 Firebase Web App 配置及 `NEXT_PUBLIC_APP_URL`，并重启开发服务器。
+3. 实测邮箱注册、Firebase 验证链接回到 `/login?verified=1`、同浏览器自动进入 `/upload` 和无 session 时手动登录分支。
 4. 实测上传诊断、FastAPI 可用与 mock fallback 两种路径、结果下载、历史查看和删除。
-5. 联调稳定后，评估是否在用户明确授权后移动 deprecated 的 Supabase/Resend/SMTP 文件到回收目录，并从依赖中彻底清理旧包。
-6. 如需要服务端级别的路由/API 强校验，再引入 Firebase Admin session 或 ID token 验证；当前 MVP 通过客户端路由保护和 Firestore Security Rules 保障数据访问。
+5. 在 Kaggle 上基于 Deep-Armocromia 数据集训练 EfficientNet-B0 四分类模型，并将导出模型接入本地 FastAPI 服务。
+6. 联调稳定后，评估是否在用户明确授权后移动 deprecated 的 Supabase/Resend/SMTP 文件到回收目录，并从依赖中彻底清理旧包。
+7. 如需要服务端级别的路由/API 强校验，再引入 Firebase Admin session 或 ID token 验证；当前 MVP 通过客户端路由保护和 Firestore Security Rules 保障数据访问。

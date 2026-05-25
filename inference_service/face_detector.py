@@ -1,8 +1,21 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 
 from color_extractor import extract_lab_features_from_bgr
+
+
+def _face_detection_class():
+    try:
+        from mediapipe import solutions
+
+        return solutions.face_detection.FaceDetection
+    except (ImportError, AttributeError):
+        try:
+            from mediapipe.python.solutions.face_detection import FaceDetection
+
+            return FaceDetection
+        except (ImportError, AttributeError):
+            return None
 
 
 def _decode_image(image_bytes: bytes) -> np.ndarray | None:
@@ -24,8 +37,27 @@ def detect_face_and_extract_skin(image_bytes: bytes) -> dict[str, object]:
     height, width = image.shape[:2]
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.55) as detector:
-        result = detector.process(rgb_image)
+    face_detection = _face_detection_class()
+    if face_detection is None:
+        return {
+            "success": False,
+            "error": "face_detection_unavailable",
+            "lab_mean": None,
+            "face_confidence": 0.0,
+            "face_rgb": None,
+        }
+
+    try:
+        with face_detection(model_selection=1, min_detection_confidence=0.55) as detector:
+            result = detector.process(rgb_image)
+    except Exception:
+        return {
+            "success": False,
+            "error": "face_detection_failed",
+            "lab_mean": None,
+            "face_confidence": 0.0,
+            "face_rgb": None,
+        }
 
     if not result.detections:
         return {
@@ -33,6 +65,7 @@ def detect_face_and_extract_skin(image_bytes: bytes) -> dict[str, object]:
             "error": "face_not_detected",
             "lab_mean": None,
             "face_confidence": 0.0,
+            "face_rgb": None,
         }
 
     detection = max(result.detections, key=lambda item: item.score[0])
@@ -52,6 +85,7 @@ def detect_face_and_extract_skin(image_bytes: bytes) -> dict[str, object]:
             "error": "face_crop_failed",
             "lab_mean": None,
             "face_confidence": confidence,
+            "face_rgb": None,
         }
 
     face_h, face_w = face.shape[:2]
@@ -73,4 +107,5 @@ def detect_face_and_extract_skin(image_bytes: bytes) -> dict[str, object]:
         "error": None,
         "lab_mean": extract_lab_features_from_bgr(skin_crop),
         "face_confidence": round(confidence, 3),
+        "face_rgb": cv2.cvtColor(face, cv2.COLOR_BGR2RGB),
     }

@@ -17,7 +17,7 @@ export interface Diagnosis {
   avoidColors: string[];
   aiDescription: string;
   labFeatures: LabFeatures;
-  source: "fastapi" | "mock";
+  source: "model" | "rules" | "mock";
   scores?: Partial<Record<SeasonType, number>>;
 }
 

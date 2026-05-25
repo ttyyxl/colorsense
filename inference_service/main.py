@@ -1,9 +1,17 @@
+import io
+import logging
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
+from color_extractor import extract_lab_features_from_bgr
 from face_detector import detect_face_and_extract_skin
 from season_classifier import classify_season
+
+logger = logging.getLogger(__name__)
 
 
 class LabFeatures(BaseModel):
@@ -39,6 +47,7 @@ def diagnose_lab(features: LabFeatures) -> dict[str, object]:
         "confidence": result["confidence"],
         "scores": result["scores"],
         "lab_features": features.model_dump(),
+        "source": "rules",
     }
 
 
@@ -52,18 +61,50 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片不能超过 10MB")
 
-    face_result = detect_face_and_extract_skin(image_bytes)
+    try:
+        original_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        original_image.load()
+    except (UnidentifiedImageError, OSError, ValueError):
+        raise HTTPException(status_code=400, detail="图片无法读取，请上传有效图片")
 
-    if not face_result["success"]:
-        raise HTTPException(status_code=422, detail=face_result["error"])
+    original_bgr = np.asarray(original_image)[:, :, ::-1].copy()
+    lab_features = extract_lab_features_from_bgr(original_bgr)
+    face_confidence = 0.0
+    model_image = original_image
 
-    lab_features = face_result["lab_mean"]
-    result = classify_season(lab_features)
+    try:
+        face_result = detect_face_and_extract_skin(image_bytes)
+        if face_result["success"]:
+            lab_features = face_result["lab_mean"]
+            face_confidence = face_result["face_confidence"]
+            model_image = Image.fromarray(face_result["face_rgb"])
+        else:
+            logger.warning(
+                "Face detection unavailable or unsuccessful (%s); using original image for model inference.",
+                face_result["error"],
+            )
+    except Exception:
+        logger.warning(
+            "Face detection failed unexpectedly; using original image for model inference.",
+            exc_info=True,
+        )
+
+    try:
+        from model_inference import predict_season
+
+        result = predict_season(model_image)
+    except Exception:
+        logger.warning("Model inference failed; falling back to LAB rules.", exc_info=True)
+        result = {
+            **classify_season(lab_features),
+            "source": "rules",
+        }
 
     return {
         "season": result["season"],
         "confidence": result["confidence"],
         "scores": result["scores"],
+        "source": result["source"],
         "lab_features": lab_features,
-        "face_confidence": face_result["face_confidence"],
+        "face_confidence": face_confidence,
     }

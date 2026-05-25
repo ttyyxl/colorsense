@@ -63,7 +63,7 @@ export function UploadZone() {
         throw new Error("登录已过期，请重新登录。");
       }
 
-      const idToken = await currentUser.getIdToken();
+      const idToken = await currentUser.getIdToken(true);
 
       const response = await fetch("/api/diagnose", {
         method: "POST",
@@ -83,6 +83,7 @@ export function UploadZone() {
       router.push(`/result/${diagnosisId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "诊断失败，请稍后重试。");
+    } finally {
       setIsSubmitting(false);
     }
   }

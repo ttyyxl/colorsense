@@ -11,7 +11,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/h
 interface InferenceResponse {
   season: SeasonType;
   confidence: number;
-  source?: "fastapi" | "mock";
+  source?: "model" | "rules" | "mock";
   scores?: Partial<Record<SeasonType, number>>;
   lab_features?: {
     L: number;
@@ -50,24 +50,26 @@ async function runInference(file: File): Promise<InferenceResponse> {
     return pickFallbackSeason(file);
   }
 
+  let response: Response;
   try {
     const formData = new FormData();
     formData.append("image", file);
 
-    const response = await fetch(`${inferenceUrl.replace(/\/$/, "")}/diagnose`, {
+    response = await fetch(`${inferenceUrl.replace(/\/$/, "")}/diagnose`, {
       method: "POST",
       body: formData,
       signal: AbortSignal.timeout(15000),
     });
-
-    if (!response.ok) {
-      return pickFallbackSeason(file);
-    }
-
-    return { ...((await response.json()) as InferenceResponse), source: "fastapi" };
   } catch {
     return pickFallbackSeason(file);
   }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(payload.detail ?? "诊断失败，请重新选择清晰的正面照。");
+  }
+
+  return (await response.json()) as InferenceResponse;
 }
 
 export async function POST(request: Request) {
@@ -91,22 +93,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "图片不能超过 10MB，请压缩后重试。" }, { status: 400 });
   }
 
-  const inference = await runInference(image);
-  const season = SEASONS[inference.season] ?? SEASONS.spring;
-  const diagnosis = {
-    seasonType: inference.season,
-    confidence: inference.confidence,
-    colorPalette: season.palette,
-    styleKeywords: season.keywords,
-    avoidColors: season.avoid,
-    aiDescription: season.styleDesc,
-    labFeatures: inference.lab_features ?? { L: 65, a: 8, b: 12 },
-    source: inference.source ?? "mock",
-    scores: inference.scores,
-  };
+  try {
+    const inference = await runInference(image);
+    const season = SEASONS[inference.season] ?? SEASONS.spring;
+    const diagnosis = {
+      seasonType: inference.season,
+      confidence: inference.confidence,
+      colorPalette: season.palette,
+      styleKeywords: season.keywords,
+      avoidColors: season.avoid,
+      aiDescription: season.styleDesc,
+      labFeatures: inference.lab_features ?? { L: 65, a: 8, b: 12 },
+      source: inference.source ?? "rules",
+      scores: inference.scores,
+    };
 
-  return NextResponse.json({
-    success: true,
-    data: diagnosis,
-  });
+    return NextResponse.json({
+      success: true,
+      data: diagnosis,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "诊断失败，请稍后重试。" },
+      { status: 422 },
+    );
+  }
 }

@@ -2,9 +2,11 @@ fastapi
 uvicorn[standard]
 python-multipart
 pydantic
-mediapipe
+mediapipe==0.10.14
 opencv-python-headless
 pillow
 numpy
 scikit-learn
 onnxruntime
+torch
+torchvision
