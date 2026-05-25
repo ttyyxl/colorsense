@@ -17,7 +17,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           <p className="text-sm font-semibold text-indigo-700">账号注册与登录</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-950">欢迎来到 ColorSense</h1>
           <p className="mt-3 leading-7 text-slate-600">
-            新用户通过邮箱验证码设置密码完成注册；已有账号可直接使用邮箱和密码登录。
+            新用户通过邮箱验证链接完成注册；已有账号可直接使用邮箱和密码登录。
           </p>
           <AuthForm nextPath={nextPath} />
         </div>

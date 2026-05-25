@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
+import { verifyAuth } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,11 @@ async function runInference(file: File): Promise<InferenceResponse> {
 }
 
 export async function POST(request: Request) {
+  const user = await verifyAuth();
+  if (!user) {
+    return NextResponse.json({ success: false, error: "请先登录后再开始诊断。" }, { status: 401 });
+  }
+
   const formData = await request.formData();
   const image = formData.get("image");
 

@@ -59,8 +59,17 @@ export function UploadZone() {
       const formData = new FormData();
       formData.append("image", file);
 
+      if (!currentUser) {
+        throw new Error("登录已过期，请重新登录。");
+      }
+
+      const idToken = await currentUser.getIdToken();
+
       const response = await fetch("/api/diagnose", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
         body: formData,
       });
 
@@ -68,10 +77,6 @@ export function UploadZone() {
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
-      }
-
-      if (!currentUser) {
-        throw new Error("登录已过期，请重新登录。");
       }
 
       const diagnosisId = await createDiagnosis(currentUser.uid, payload.data);
