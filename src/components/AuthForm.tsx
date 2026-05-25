@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
   sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -18,12 +19,59 @@ interface AuthFormProps {
   nextPath: string;
 }
 
+const verificationReturnUrl = `${(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/login?verified=1`;
+
 export function AuthForm({ nextPath }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [pending, setPending] = useState<"register" | "login" | "google" | null>(null);
+
+  useEffect(() => {
+    const isVerificationReturn = new URLSearchParams(window.location.search).get("verified") === "1";
+    if (!isVerificationReturn || !auth) {
+      return;
+    }
+
+    let active = true;
+    let unsubscribe: () => void = () => undefined;
+    setNotice({ type: "success", text: "邮箱验证成功，正在检查登录状态..." });
+
+    unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      unsubscribe();
+      if (!active) {
+        return;
+      }
+
+      if (!currentUser) {
+        setNotice({ type: "success", text: "邮箱验证成功，请使用邮箱和密码登录。" });
+        return;
+      }
+
+      try {
+        await currentUser.reload();
+        if (!active) {
+          return;
+        }
+        if (currentUser.emailVerified) {
+          router.replace("/upload");
+          router.refresh();
+          return;
+        }
+        setNotice({ type: "error", text: "邮箱验证状态尚未更新，请刷新页面或重新登录。" });
+      } catch {
+        if (active) {
+          setNotice({ type: "error", text: "邮箱验证状态检查失败，请刷新页面或重新登录。" });
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [router]);
 
   function canSubmit() {
     if (!isFirebaseConfigured() || !auth) {
@@ -50,9 +98,8 @@ export function AuthForm({ nextPath }: AuthFormProps) {
     setNotice(null);
     try {
       const credential = await createUserWithEmailAndPassword(auth!, email.trim(), password);
-      await sendEmailVerification(credential.user);
-      await signOut(auth!);
-      setNotice({ type: "success", text: "注册成功，验证邮件已发送。请先点击邮箱中的验证链接，再进行登录。" });
+      await sendEmailVerification(credential.user, { url: verificationReturnUrl });
+      setNotice({ type: "success", text: "验证邮件已发送。请打开邮箱并点击验证链接完成注册。" });
     } catch {
       setNotice({ type: "error", text: "注册失败。该邮箱可能已注册，或 Firebase 配置不可用。" });
     } finally {
@@ -71,7 +118,7 @@ export function AuthForm({ nextPath }: AuthFormProps) {
       await credential.user.reload();
       if (!credential.user.emailVerified) {
         await signOut(auth!);
-        setNotice({ type: "error", text: "请先完成邮箱验证，再登录使用诊断功能。" });
+        setNotice({ type: "error", text: "请先前往邮箱完成验证。" });
         return;
       }
       router.push(nextPath);
