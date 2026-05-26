@@ -3,6 +3,11 @@ import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
 import { verifyAuth } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { generateAiAdvice } from "@/lib/claude";
+import { buildUserPrompt } from "@/prompts/buildPrompt";
+import { generateDoubaoStyleAdvice } from "@/lib/ai";
+import { buildDoubaoUserPrompt } from "@/prompts/doubaoBuildPrompt";
+import { GeminiInferenceData } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -131,11 +136,37 @@ export async function POST(request: Request) {
     };
     const { scores, ...requiredDiagnosisFields } = diagnosis;
 
+    // 生成 AI 建议
+    console.info("[diagnose-debug] Generating AI advice...");
+    const aiUserPrompt = buildUserPrompt({
+      seasonType: diagnosis.seasonType as SeasonType,
+      confidence: diagnosis.confidence,
+      labFeatures: diagnosis.labFeatures,
+      styleKeywords: diagnosis.styleKeywords,
+    });
+    const aiAdvice = await generateAiAdvice(aiUserPrompt);
+
+    // 生成豆包大模型建议
+    console.info("[diagnose-debug] Generating Doubao style advice...");
+    const doubaoAdvice = await generateDoubaoStyleAdvice(
+      buildDoubaoUserPrompt({
+        season: inference.season,
+        confidence: inference.confidence,
+        lab_features: diagnosis.labFeatures,
+        recommended_colors: diagnosis.colorPalette.slice(0, 3),
+        avoid_colors: diagnosis.avoidColors.slice(0, 2),
+        keywords: diagnosis.styleKeywords,
+        style_desc: diagnosis.aiDescription,
+      })
+    ).catch(() => undefined);
+
     let diagnosisId: string;
     try {
       const docRef = await getAdminDb().collection("diagnoses").add({
         ...requiredDiagnosisFields,
         ...(scores === undefined ? {} : { scores }),
+        aiAdvice,
+        doubaoAdvice, // 存储豆包建议
         userId: user.uid,
         createdAt: new Date(),
       });
@@ -156,7 +187,11 @@ export async function POST(request: Request) {
     const finalPayload = {
       success: true,
       diagnosisId,
-      data: diagnosis,
+      data: {
+        ...diagnosis,
+        aiAdvice,
+        doubaoAdvice,
+      },
     };
     console.info("[diagnose-debug] Final response", {
       keys: Object.keys(finalPayload),

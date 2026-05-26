@@ -5,6 +5,8 @@ import { ColorPalette } from "@/components/ColorPalette";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SeasonCard } from "@/components/SeasonCard";
+import { AiAdviceSection } from "@/components/AiAdviceSection";
+import { DoubaoAdviceSection } from "@/components/DoubaoAdviceSection";
 import { ShareModal } from "@/components/ShareModal";
 import { getUserDiagnosis } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
@@ -90,6 +92,15 @@ export default function ResultPage({ params }: ResultPageProps) {
                 <p className="mt-3 text-sm text-indigo-100">Result ID: {id}</p>
               </header>
               <SeasonCard season={season} confidence={diagnosis.confidence} />
+              
+              {diagnosis.aiAdvice && (
+                <AiAdviceSection advice={diagnosis.aiAdvice} />
+              )}
+
+              {diagnosis.doubaoAdvice && (
+                <DoubaoAdviceSection advice={diagnosis.doubaoAdvice} />
+              )}
+
               {diagnosis.scores && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="text-xl font-bold text-slate-950">四季分类置信分数</h2>

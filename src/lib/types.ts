@@ -6,6 +6,46 @@ export interface LabFeatures {
   b: number;
 }
 
+export interface AiAdvice {
+  summary: string;
+  clothing: {
+    colors: string[];
+    advice: string;
+  };
+  makeup: {
+    advice: string;
+  };
+  avoid: string;
+}
+
+export interface GeminiInferenceData {
+  season: string;
+  confidence: number;
+  undertone: string;
+  brightness: string;
+  contrast: string;
+  skin_lab: {
+    l: number;
+    a: number;
+    b: number;
+  };
+  hair_color: string;
+  eye_color: string;
+  recommended_colors: string[];
+  avoid_colors: string[];
+}
+
+export interface GeminiStyleAdvice {
+  title: string;
+  summary: string;
+  style_keywords: string[];
+  fashion_recommendations: string[];
+  makeup_recommendations: string[];
+  hair_recommendations: string[];
+  accessory_recommendations: string[];
+  avoid_recommendations: string[];
+}
+
 export interface Diagnosis {
   id: string;
   userId: string;
@@ -19,6 +59,8 @@ export interface Diagnosis {
   labFeatures: LabFeatures;
   source: "model" | "rules" | "mock";
   scores?: Partial<Record<SeasonType, number>>;
+  aiAdvice?: AiAdvice;
+  doubaoAdvice?: DoubaoStyleAdvice;
 }
 
 export type NewDiagnosis = Omit<Diagnosis, "id" | "userId" | "createdAt">;
