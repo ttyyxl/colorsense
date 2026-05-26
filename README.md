@@ -87,7 +87,7 @@ uvicorn main:app --reload
 
 推理服务推荐使用 Python 3.10 或 3.11。`mediapipe==0.10.35` 用于可选的人脸裁剪；若该版本在本机环境中不提供兼容的人脸检测入口，`/diagnose` 会记录 warning 并改用原始 RGB 图片执行模型推理，不会因此中断诊断请求。
 
-未启动 FastAPI 或未填写 `INFERENCE_SERVICE_URL` 时，`/api/diagnose` 会返回 mock 诊断结果，并将 `source` 标记为 `mock`。
+正式诊断流程必须启动 FastAPI 并配置 `INFERENCE_SERVICE_URL`；服务不可用时 `/api/diagnose` 会返回失败，不会保存 mock 结果。FastAPI 真实模型推理失败时，会使用 LAB 规则分类作为后端 fallback，并将 `source` 标记为 `rules`。
 
 ### Windows 本地代理
 

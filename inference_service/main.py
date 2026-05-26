@@ -1,5 +1,6 @@
 import io
 import logging
+from time import perf_counter
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +54,7 @@ def diagnose_lab(features: LabFeatures) -> dict[str, object]:
 
 @app.post("/diagnose")
 async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
+    request_started_at = perf_counter()
     if image.content_type not in {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}:
         raise HTTPException(status_code=400, detail="仅支持 JPG、PNG、HEIC 或 WebP 图片")
 
@@ -92,7 +94,13 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
     try:
         from model_inference import predict_season
 
+        inference_started_at = perf_counter()
         result = predict_season(model_image)
+        logger.info(
+            "Model inference completed source=%s duration_ms=%.1f.",
+            result["source"],
+            (perf_counter() - inference_started_at) * 1000,
+        )
     except Exception:
         logger.warning("Model inference failed; falling back to LAB rules.", exc_info=True)
         result = {
@@ -100,7 +108,7 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
             "source": "rules",
         }
 
-    return {
+    response = {
         "season": result["season"],
         "confidence": result["confidence"],
         "scores": result["scores"],
@@ -108,3 +116,9 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
         "lab_features": lab_features,
         "face_confidence": face_confidence,
     }
+    logger.info(
+        "Diagnosis request completed source=%s duration_ms=%.1f.",
+        result["source"],
+        (perf_counter() - request_started_at) * 1000,
+    )
+    return response

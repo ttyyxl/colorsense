@@ -3,7 +3,6 @@
 import { Camera, Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { createDiagnosis } from "@/lib/firestore-diagnoses";
 import { useAuth } from "@/lib/useAuth";
 import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
@@ -74,13 +73,26 @@ export function UploadZone() {
       });
 
       const payload = (await response.json()) as ApiResponse<NewDiagnosis>;
+      console.info("[diagnose-debug] API response", {
+        status: response.status,
+        ok: response.ok,
+        keys: Object.keys(payload),
+        diagnosisIdPresent: payload.success && Boolean(payload.diagnosisId),
+      });
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
       }
 
-      const diagnosisId = await createDiagnosis(currentUser.uid, payload.data);
-      router.push(`/result/${diagnosisId}`);
+      if (!payload.diagnosisId) {
+        throw new Error("Diagnosis completed, but no result ID was returned. Please try again.");
+      }
+
+      console.info("[diagnose-debug] Router navigation", {
+        routerPushExecuted: true,
+        diagnosisIdPresent: true,
+      });
+      router.push(`/result/${payload.diagnosisId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "诊断失败，请稍后重试。");
     } finally {

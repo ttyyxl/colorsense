@@ -36,6 +36,9 @@ export default function ResultPage({ params }: ResultPageProps) {
         if (!payload) {
           throw new Error("没有找到这次诊断记录，或你无权查看该记录。");
         }
+        if (!SEASONS[payload.seasonType]) {
+          throw new Error("The diagnosis result contains an unsupported season type. Please run a new diagnosis.");
+        }
         if (!ignore) {
           setDiagnosis(payload);
         }

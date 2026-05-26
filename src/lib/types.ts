@@ -25,6 +25,7 @@ export type NewDiagnosis = Omit<Diagnosis, "id" | "userId" | "createdAt">;
 
 export interface ApiSuccess<T> {
   success: true;
+  diagnosisId: string;
   data: T;
 }
 

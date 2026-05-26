@@ -2,16 +2,25 @@ import { NextResponse } from "next/server";
 import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
 import { verifyAuth } from "@/lib/auth-server";
+import { getAdminDb } from "@/lib/firebase-admin";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const INFERENCE_TIMEOUT_MS = 60_000;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
+class InferenceTimeoutError extends Error {
+  constructor() {
+    super("AI inference timed out. Please try again with a smaller image.");
+    this.name = "InferenceTimeoutError";
+  }
+}
+
 interface InferenceResponse {
-  season: SeasonType;
+  season: string;
   confidence: number;
-  source?: "model" | "rules" | "mock";
+  source?: "model" | "rules";
   scores?: Partial<Record<SeasonType, number>>;
   lab_features?: {
     L: number;
@@ -20,37 +29,20 @@ interface InferenceResponse {
   };
 }
 
-function pickFallbackSeason(file: File): InferenceResponse {
-  const seasons: SeasonType[] = ["spring", "summer", "autumn", "winter"];
-  const seed = [...file.name].reduce((sum, char) => sum + char.charCodeAt(0), file.size);
-  const season = seasons[seed % seasons.length];
-
-  return {
-    season,
-    confidence: 0.72,
-    source: "mock",
-    scores: {
-      spring: season === "spring" ? 0.72 : 0.09,
-      summer: season === "summer" ? 0.72 : 0.09,
-      autumn: season === "autumn" ? 0.72 : 0.09,
-      winter: season === "winter" ? 0.72 : 0.09,
-    },
-    lab_features: {
-      L: 65,
-      a: 8,
-      b: 12,
-    },
-  };
-}
-
 async function runInference(file: File): Promise<InferenceResponse> {
   const inferenceUrl = process.env.INFERENCE_SERVICE_URL;
 
   if (!inferenceUrl) {
-    return pickFallbackSeason(file);
+    throw new Error("Inference service is not configured.");
   }
 
   let response: Response;
+  const startedAt = Date.now();
+  console.info("[diagnose-debug] FastAPI request start", {
+    inferenceServiceUrlPresent: true,
+    timeoutMs: INFERENCE_TIMEOUT_MS,
+  });
+
   try {
     const formData = new FormData();
     formData.append("image", file);
@@ -58,24 +50,50 @@ async function runInference(file: File): Promise<InferenceResponse> {
     response = await fetch(`${inferenceUrl.replace(/\/$/, "")}/diagnose`, {
       method: "POST",
       body: formData,
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(INFERENCE_TIMEOUT_MS),
     });
-  } catch {
-    return pickFallbackSeason(file);
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    console.error("[diagnose-debug] FastAPI request failed", {
+      durationMs,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new InferenceTimeoutError();
+    }
+    throw new Error("Inference service is unavailable. Please try again.");
   }
+
+  console.info("[diagnose-debug] FastAPI response", {
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+  });
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { detail?: string };
     throw new Error(payload.detail ?? "诊断失败，请重新选择清晰的正面照。");
   }
 
-  return (await response.json()) as InferenceResponse;
+  const payload = (await response.json()) as InferenceResponse;
+  console.info("[diagnose-debug] FastAPI payload", {
+    keys: Object.keys(payload),
+  });
+  return payload;
+}
+
+function isSeasonType(value: string): value is SeasonType {
+  return value in SEASONS;
 }
 
 export async function POST(request: Request) {
   const user = await verifyAuth();
   if (!user) {
     return NextResponse.json({ success: false, error: "请先登录后再开始诊断。" }, { status: 401 });
+  }
+
+  const canUseDiagnosisFeatures = user.email_verified === true || user.firebase?.sign_in_provider === "google.com";
+  if (!canUseDiagnosisFeatures) {
+    return NextResponse.json({ success: false, error: "Please verify your email before starting a diagnosis." }, { status: 403 });
   }
 
   const formData = await request.formData();
@@ -95,7 +113,11 @@ export async function POST(request: Request) {
 
   try {
     const inference = await runInference(image);
-    const season = SEASONS[inference.season] ?? SEASONS.spring;
+    if (!isSeasonType(inference.season)) {
+      throw new Error("Inference service returned an unsupported season.");
+    }
+
+    const season = SEASONS[inference.season];
     const diagnosis = {
       seasonType: inference.season,
       confidence: inference.confidence,
@@ -107,12 +129,44 @@ export async function POST(request: Request) {
       source: inference.source ?? "rules",
       scores: inference.scores,
     };
+    const { scores, ...requiredDiagnosisFields } = diagnosis;
 
-    return NextResponse.json({
+    let diagnosisId: string;
+    try {
+      const docRef = await getAdminDb().collection("diagnoses").add({
+        ...requiredDiagnosisFields,
+        ...(scores === undefined ? {} : { scores }),
+        userId: user.uid,
+        createdAt: new Date(),
+      });
+      diagnosisId = docRef.id;
+      console.info("[diagnose-debug] Firestore write", {
+        succeeded: true,
+        diagnosisIdPresent: Boolean(diagnosisId),
+      });
+    } catch (error) {
+      console.error("[diagnose-debug] Firestore write failed", {
+        succeeded: false,
+        diagnosisIdPresent: false,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return NextResponse.json({ success: false, error: "Failed to save the diagnosis result. Please try again." }, { status: 500 });
+    }
+
+    const finalPayload = {
       success: true,
+      diagnosisId,
       data: diagnosis,
+    };
+    console.info("[diagnose-debug] Final response", {
+      keys: Object.keys(finalPayload),
+      diagnosisIdPresent: Boolean(diagnosisId),
     });
+    return NextResponse.json(finalPayload);
   } catch (error) {
+    if (error instanceof InferenceTimeoutError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 504 });
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "诊断失败，请稍后重试。" },
       { status: 422 },
