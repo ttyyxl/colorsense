@@ -10,7 +10,14 @@ import { getUserDiagnosis } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
 import { useAuth } from "@/lib/useAuth";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const SCORE_LABELS = {
+  spring: "Spring / 春",
+  summer: "Summer / 夏",
+  autumn: "Autumn / 秋",
+  winter: "Winter / 冬",
+} as const;
 
 interface ResultPageProps {
   params: { id: string };
@@ -19,6 +26,7 @@ interface ResultPageProps {
 export default function ResultPage({ params }: ResultPageProps) {
   const { id } = params;
   const { currentUser } = useAuth();
+  const cardRef = useRef<HTMLDivElement>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [error, setError] = useState("");
   const season = diagnosis ? SEASONS[diagnosis.seasonType] : null;
@@ -75,8 +83,37 @@ export default function ResultPage({ params }: ResultPageProps) {
 
         {diagnosis && season && (
           <>
-            <div id="share-card" className="mt-4 space-y-6">
+            <div ref={cardRef} id="share-card" className="mt-4 space-y-6 rounded-3xl bg-white p-5 sm:p-8">
+              <header className="rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 p-6 text-white">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-100">ColorSense</p>
+                <h1 className="mt-2 text-2xl font-bold">色彩季型诊断结果</h1>
+                <p className="mt-3 text-sm text-indigo-100">Result ID: {id}</p>
+              </header>
               <SeasonCard season={season} confidence={diagnosis.confidence} />
+              {diagnosis.scores && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-bold text-slate-950">四季分类置信分数</h2>
+                  <div className="mt-5 space-y-4">
+                    {Object.entries(SCORE_LABELS).map(([key, label]) => {
+                      const score = diagnosis.scores?.[key as keyof typeof SCORE_LABELS] ?? 0;
+                      return (
+                        <div key={key}>
+                          <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                            <span className="font-semibold text-slate-700">{label}</span>
+                            <span className="text-slate-500">{Math.round(score * 100)}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-indigo-500"
+                              style={{ width: `${Math.max(0, Math.min(score, 1)) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-xl font-bold text-slate-950">推荐穿搭色系</h2>
                 <div className="mt-5">
@@ -98,7 +135,7 @@ export default function ResultPage({ params }: ResultPageProps) {
               </section>
             </div>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <ShareModal />
+              <ShareModal diagnosisId={id} cardRef={cardRef} />
               <Link href="/upload" className="rounded-2xl border border-indigo-100 bg-white p-5 font-semibold text-indigo-700">
                 重新诊断
               </Link>
