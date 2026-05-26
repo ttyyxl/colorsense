@@ -26,9 +26,14 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 INFERENCE_SERVICE_URL=http://localhost:8000
+
+# Firebase Admin，受保护的 Next.js API 路由需要
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
-不要提交 `.env.local`。
+Firebase Admin 三项配置来自同一 Firebase 项目的 Service Account JSON：在 Firebase Console 的 `Project settings -> Service accounts` 中生成私钥文件，将其中的 `project_id`、`client_email`、`private_key` 填入上述变量。`FIREBASE_PROJECT_ID` 必须与 `NEXT_PUBLIC_FIREBASE_PROJECT_ID` 指向同一个项目。不要提交 `.env.local` 或下载的私钥 JSON 文件。
 
 ## Firebase 配置
 
@@ -80,9 +85,22 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-推理服务推荐使用 Python 3.10 或 3.11。`mediapipe==0.10.14` 用于可选的人脸裁剪；若 MediaPipe 在本机环境中不可用，`/diagnose` 会记录 warning 并改用原始 RGB 图片执行模型推理，不会因此中断诊断请求。
+推理服务推荐使用 Python 3.10 或 3.11。`mediapipe==0.10.35` 用于可选的人脸裁剪；若该版本在本机环境中不提供兼容的人脸检测入口，`/diagnose` 会记录 warning 并改用原始 RGB 图片执行模型推理，不会因此中断诊断请求。
 
 未启动 FastAPI 或未填写 `INFERENCE_SERVICE_URL` 时，`/api/diagnose` 会返回 mock 诊断结果，并将 `source` 标记为 `mock`。
+
+### Windows 本地代理
+
+`/api/diagnose` 会在服务端通过 Firebase Admin 校验登录用户的 ID token。该校验需要访问 Google 公钥地址。如果本机网络需要代理，必须在启动 Next.js 的同一个 PowerShell 窗口中先设置代理：
+
+```powershell
+cd "D:\桌面\machine learning\大作业\colorsense"
+$env:HTTP_PROXY="http://127.0.0.1:你的代理端口"
+$env:HTTPS_PROXY="http://127.0.0.1:你的代理端口"
+npm run dev
+```
+
+项目会将代理传给 Firebase Admin 的 HTTP agent。更改 `.env.local` 或代理环境变量后，需要停止并重新启动 `npm run dev`。
 
 ## 模型训练计划
 

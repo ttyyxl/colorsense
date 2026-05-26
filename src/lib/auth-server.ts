@@ -1,18 +1,30 @@
-import { adminAuth } from "./firebase-admin";
+import { getAdminAuth, getFirebaseAdminDebugState } from "./firebase-admin";
 import { headers } from "next/headers";
 
 export async function verifyAuth() {
   const authHeader = headers().get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[auth-debug]", {
+      authorizationHeaderPresent: Boolean(authHeader),
+      tokenPresent: Boolean(token),
+      tokenLength: token.length,
+      ...getFirebaseAdminDebugState(),
+    });
+  }
+
+  if (!token) {
     return null;
   }
 
-  const token = authHeader.split("Bearer ")[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
+    const decodedToken = await getAdminAuth().verifyIdToken(token);
     return decodedToken;
   } catch (error) {
-    console.error("Error verifying Firebase ID token:", error);
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "unknown";
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[auth-debug] verifyIdToken failed", { code, message });
     return null;
   }
 }
