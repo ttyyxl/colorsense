@@ -21,6 +21,19 @@ export function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function resetSelectedImage() {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setFile(null);
+    setPreviewUrl("");
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
   function selectFile(nextFile?: File) {
     setError("");
     setNoClearFace(false);
@@ -85,6 +98,7 @@ export function UploadZone() {
 
       if (!response.ok || !payload.success) {
         if (!payload.success && payload.error === "NO_CLEAR_FACE") {
+          resetSelectedImage();
           setNoClearFace(true);
           setError(NO_CLEAR_FACE_MESSAGE);
           return;
