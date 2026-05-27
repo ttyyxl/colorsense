@@ -25,7 +25,7 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-INFERENCE_SERVICE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 # Firebase Admin，受保护的 Next.js API 路由需要
 FIREBASE_PROJECT_ID=
@@ -85,9 +85,11 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-推理服务推荐使用 Python 3.10 或 3.11。`mediapipe==0.10.35` 用于可选的人脸裁剪；若该版本在本机环境中不提供兼容的人脸检测入口，`/diagnose` 会记录 warning 并改用原始 RGB 图片执行模型推理，不会因此中断诊断请求。
+推理服务推荐使用 Python 3.10 或 3.11。`mediapipe==0.10.35` 用于人脸裁剪。诊断仅接受清晰、单人、真人正脸：人脸候选置信度必须达到 `MIN_FACE_CONFIDENCE = 0.80`，并通过人脸框尺寸与眼睛/鼻子/嘴部关键点几何校验。如果无法检测到有效人脸区域、置信度不足、质量校验失败或人脸检测不可用，`/diagnose` 会返回 `422 NO_CLEAR_FACE`，不会使用原始图片执行季型推理，也不会生成可保存的诊断结果。
 
-正式诊断流程必须启动 FastAPI 并配置 `INFERENCE_SERVICE_URL`；服务不可用时 `/api/diagnose` 会返回失败，不会保存 mock 结果。FastAPI 真实模型推理失败时，会使用 LAB 规则分类作为后端 fallback，并将 `source` 标记为 `rules`。
+动物、玩偶、卡通、风景、物体、多人合照，以及模糊、遮挡或强逆光导致质量不足的照片均不应进入季型模型推理。若出现类似动物图片被检测为 `face_confidence=0.592` 的 face-like 候选，服务会因低于 `0.80` 阈值而拒绝该请求。
+
+正式诊断流程必须启动 FastAPI 并配置 `NEXT_PUBLIC_API_BASE_URL`；服务不可用时 `/api/diagnose` 会返回失败，不会保存 mock 结果。仅在已取得有效人脸区域后，如真实模型加载或推理失败，FastAPI 才会使用该人脸特征进行 LAB 规则 fallback，并将 `source` 标记为 `rules`。
 
 ### Windows 本地代理
 

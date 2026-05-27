@@ -8,6 +8,7 @@ import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传正面人像照片。";
 
 export function UploadZone() {
   const router = useRouter();
@@ -16,11 +17,13 @@ export function UploadZone() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [noClearFace, setNoClearFace] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function selectFile(nextFile?: File) {
     setError("");
+    setNoClearFace(false);
 
     if (!nextFile) {
       return;
@@ -81,6 +84,11 @@ export function UploadZone() {
       });
 
       if (!response.ok || !payload.success) {
+        if (!payload.success && payload.error === "NO_CLEAR_FACE") {
+          setNoClearFace(true);
+          setError(NO_CLEAR_FACE_MESSAGE);
+          return;
+        }
         throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
       }
 
@@ -155,6 +163,18 @@ export function UploadZone() {
       )}
 
       {error && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
+      {noClearFace && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">重新拍摄建议</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>请上传真人正脸照片，保持脸部正对镜头</li>
+            <li>避免遮挡、墨镜、口罩</li>
+            <li>避免强逆光或过暗环境</li>
+            <li>尽量使用自然光</li>
+            <li>请勿上传动物、卡通、风景、物体或多人合照</li>
+          </ul>
+        </div>
+      )}
 
       <button
         type="button"

@@ -7,6 +7,12 @@ export interface LabFeatures {
   b: number;
 }
 
+export interface DiagnosisQuality {
+  faceDetected: boolean;
+  usedOriginalImage: boolean;
+  faceConfidence: number;
+}
+
 export interface AiAdvice {
   summary: string;
   clothing: {
@@ -60,6 +66,9 @@ export interface Diagnosis {
   labFeatures: LabFeatures;
   source: "model" | "rules" | "mock";
   scores?: Partial<Record<SeasonType, number>>;
+  faceDetected?: boolean;
+  usedOriginalImage?: boolean;
+  faceConfidence?: number;
   aiAdvice?: AiAdvice;
   doubaoAdvice?: DoubaoStyleAdvice;
 }
@@ -75,6 +84,8 @@ export interface ApiSuccess<T> {
 export interface ApiError {
   success: false;
   error: string;
+  message?: string;
+  quality?: DiagnosisQuality;
 }
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;

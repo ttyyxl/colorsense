@@ -7,18 +7,29 @@ import { generateAiAdvice } from "@/lib/claude";
 import { buildUserPrompt } from "@/prompts/buildPrompt";
 import { generateDoubaoStyleAdvice } from "@/lib/ai";
 import { buildDoubaoUserPrompt } from "@/prompts/doubaoBuildPrompt";
-import { GeminiInferenceData } from "@/lib/types";
+import type { DiagnosisQuality } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const INFERENCE_TIMEOUT_MS = 60_000;
+const MIN_FACE_CONFIDENCE = 0.8;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 class InferenceTimeoutError extends Error {
   constructor() {
     super("AI inference timed out. Please try again with a smaller image.");
     this.name = "InferenceTimeoutError";
+  }
+}
+
+class NoClearFaceError extends Error {
+  quality: DiagnosisQuality;
+
+  constructor(message: string, quality: DiagnosisQuality) {
+    super(message);
+    this.name = "NoClearFaceError";
+    this.quality = quality;
   }
 }
 
@@ -32,6 +43,10 @@ interface InferenceResponse {
     a: number;
     b: number;
   };
+  faceDetected?: boolean;
+  usedOriginalImage?: boolean;
+  face_confidence?: number;
+  quality?: Partial<DiagnosisQuality>;
 }
 
 async function runInference(file: File): Promise<InferenceResponse> {
@@ -75,7 +90,18 @@ async function runInference(file: File): Promise<InferenceResponse> {
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { detail?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      quality?: DiagnosisQuality;
+      detail?: string;
+    };
+    if (response.status === 422 && payload.error === "NO_CLEAR_FACE") {
+      throw new NoClearFaceError(
+        payload.message ?? "未检测到清晰人脸，请在自然光下上传正面人像照片后重试。",
+        payload.quality ?? { faceDetected: false, usedOriginalImage: true, faceConfidence: 0 },
+      );
+    }
     throw new Error(payload.detail ?? "诊断失败，请重新选择清晰的正面照。");
   }
 
@@ -118,6 +144,24 @@ export async function POST(request: Request) {
 
   try {
     const inference = await runInference(image);
+    const faceDetected = inference.quality?.faceDetected ?? inference.faceDetected;
+    const usedOriginalImage = inference.quality?.usedOriginalImage ?? inference.usedOriginalImage;
+    const faceConfidence = inference.quality?.faceConfidence ?? inference.face_confidence;
+    if (
+      faceDetected !== true ||
+      usedOriginalImage !== false ||
+      typeof faceConfidence !== "number" ||
+      faceConfidence < MIN_FACE_CONFIDENCE
+    ) {
+      throw new NoClearFaceError(
+        "未检测到清晰人脸，请在自然光下上传正面人像照片后重试。",
+        {
+          faceDetected: faceDetected ?? false,
+          usedOriginalImage: usedOriginalImage ?? true,
+          faceConfidence: faceConfidence ?? 0,
+        },
+      );
+    }
     if (!isSeasonType(inference.season)) {
       throw new Error("Inference service returned an unsupported season.");
     }
@@ -133,6 +177,9 @@ export async function POST(request: Request) {
       labFeatures: inference.lab_features ?? { L: 65, a: 8, b: 12 },
       source: inference.source ?? "rules",
       scores: inference.scores,
+      faceDetected,
+      usedOriginalImage,
+      faceConfidence,
     };
     const { scores, ...requiredDiagnosisFields } = diagnosis;
 
@@ -199,6 +246,12 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(finalPayload);
   } catch (error) {
+    if (error instanceof NoClearFaceError) {
+      return NextResponse.json(
+        { success: false, error: "NO_CLEAR_FACE", message: error.message, quality: error.quality },
+        { status: 422 },
+      );
+    }
     if (error instanceof InferenceTimeoutError) {
       return NextResponse.json({ success: false, error: error.message }, { status: 504 });
     }

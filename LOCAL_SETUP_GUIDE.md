@@ -93,7 +93,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\venv\Scripts\Activate.ps1
 ```
 
-当前项目依赖 `mediapipe==0.10.35`。人脸检测不可用时，后端会使用原始 RGB 图片继续进行模型推理，不应导致 `/diagnose` 直接失败。
+当前项目依赖 `mediapipe==0.10.35`。诊断仅接受清晰、单人、真人正脸，人脸候选置信度必须达到 `MIN_FACE_CONFIDENCE = 0.80`，且人脸框尺寸和眼睛/鼻子/嘴部关键点几何关系必须有效。未检测到有效人脸区域、候选置信度不足、质量校验失败或人脸检测不可用时，后端会返回 `422 NO_CLEAR_FACE` 并中断诊断；不得使用原始 RGB 图片继续进行季型推理。
 
 确认模型文件存在：
 
@@ -141,6 +141,29 @@ curl.exe -X POST "http://localhost:8000/diagnose" -F "image=@C:\path\to\face.jpg
 
 若返回 `"source": "rules"`，说明请求成功，但真实模型加载或推理失败，后端使用了规则 fallback；此时检查 FastAPI 终端 warning 日志和模型文件。
 
+若上传图片没有清晰人脸，应返回 `422`，且响应包含：
+
+```json
+{
+  "error": "NO_CLEAR_FACE",
+  "message": "未检测到清晰人脸，请在自然光下上传正面人像照片后重试。",
+  "quality": {
+    "faceDetected": false,
+    "usedOriginalImage": true,
+    "faceConfidence": 0.0
+  }
+}
+```
+
+此时 FastAPI 日志不应出现 `Model prediction predicted_idx=...`。
+
+例如动物图片若产生 `face_confidence=0.592` 的 face-like 候选，由于低于 `0.80` 阈值，也必须返回 `422 NO_CLEAR_FACE`，日志应出现：
+
+```text
+[diagnose] Face confidence too low; aborting diagnosis.
+[diagnose] Returning 422 NO_CLEAR_FACE.
+```
+
 ## 4. Firebase 前端配置
 
 在项目根目录创建 `.env.local`：
@@ -161,7 +184,7 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-INFERENCE_SERVICE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 这些值从 Firebase Console 获取：
@@ -300,13 +323,15 @@ http://localhost:3000
 7. 查看 FastAPI 终端：
 
    - 应出现 `POST /diagnose HTTP/1.1" 200`。
-   - 如果 MediaPipe 不可用，可以出现 warning，但请求仍应继续使用真实模型推理。
+   - 对清晰人脸，日志应显示 `faceDetected=True`、`usedOriginalImage=False` 并进入模型推理。
+   - 如果没有检测到清晰人脸、候选低于 `0.80`、人脸几何校验失败或 MediaPipe 不可用，接口应返回 `422 NO_CLEAR_FACE`，不应出现模型预测日志。
 
 8. 检查页面行为：
 
    - 保存成功后应跳转到 `/result/{diagnosisId}`，或展示对应分析结果。
    - 刷新结果页后仍能读取该记录。
    - 历史记录页应可看到当前登录用户保存的诊断记录。
+   - 无清晰真人正脸时应停留上传页并提示重新上传，不应创建 Firestore 诊断记录；动物、玩偶、卡通、风景、物体和多人合照均按此处理。
 
 ## 9. Firestore 与登录状态确认
 
@@ -364,6 +389,12 @@ Invoke-RestMethod "http://localhost:8000/health"
 # FastAPI 直接模型诊断，不经过 Next.js 登录保护
 curl.exe -X POST "http://localhost:8000/diagnose" -F "image=@C:\path\to\face.jpg;type=image/jpeg"
 
+# FastAPI 无清晰人脸校验，应返回 422 NO_CLEAR_FACE 且不记录模型预测日志
+curl.exe -X POST "http://localhost:8000/diagnose" -F "image=@C:\path\to\no-face.png;type=image/png"
+
+# 动物或 face-like 低置信度候选校验，例如 face_confidence=0.592，应返回 422 NO_CLEAR_FACE
+curl.exe -X POST "http://localhost:8000/diagnose" -F "image=@C:\path\to\animal.jpg;type=image/jpeg"
+
 # 代理连通 Google 公钥服务
 Invoke-WebRequest "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com" -UseBasicParsing
 ```
@@ -390,6 +421,8 @@ Invoke-WebRequest "https://www.googleapis.com/robot/v1/metadata/x509/securetoken
 | `Failed to download Inter from Google Fonts` | 开发环境无法访问字体服务 | 检查网络/代理；该错误与模型推理或 token 校验分开定位 |
 | `mediapipe==...` 安装失败 | Python 或 pip 环境不兼容，或未使用最新 requirements | 确认代码为最新 `main`，使用 Python 3.10/3.11，升级 pip 后安装 `mediapipe==0.10.35` |
 | FastAPI `/health` 无法访问 | 服务未启动、虚拟环境未激活或端口被占用 | 查看 FastAPI 启动日志，确认端口 `8000` 可用 |
+| `/diagnose` 返回 `422 NO_CLEAR_FACE` | 图片没有清晰正脸、人脸 crop 无效或检测组件不可用 | 使用自然光下清晰正脸照重试；该请求不会生成季型结果或写入诊断记录 |
+| 动物/卡通/物体图片被识别为 face-like 候选 | 检测器找到低置信度相似区域 | 确认日志显示低于 `MIN_FACE_CONFIDENCE = 0.80` 后返回 `422 NO_CLEAR_FACE`，且无模型预测日志 |
 | `/diagnose` 返回 `source: "rules"` | 模型加载/推理异常触发 fallback | 检查模型文件路径、torch/torchvision 安装以及 FastAPI warning 日志 |
 
 ## 12. 本地运行成功标准
@@ -399,8 +432,8 @@ Invoke-WebRequest "https://www.googleapis.com/robot/v1/metadata/x509/securetoken
 - `npm run dev` 可正常启动 Next.js。
 - FastAPI 已启动，`GET /health` 返回 `{"status":"ok"}`。
 - 浏览器能够完成 Firebase 登录。
-- 上传页发出的 `POST /api/diagnose` 携带 `Authorization: Bearer ...` 并返回 `200`。
-- FastAPI 收到 `POST /diagnose` 并返回 `200`。
-- 正常情况下诊断响应包含 `source: "model"`。
-- Firestore 中新增对应诊断记录。
-- 页面可进入 `/result/{diagnosisId}` 并展示结果，历史记录页可以读取保存的数据。
+- 上传清晰正脸时，上传页发出的 `POST /api/diagnose` 携带 `Authorization: Bearer ...` 并返回 `200`。
+- 上传清晰真人正脸且 `faceConfidence >= 0.80` 时，FastAPI 收到 `POST /diagnose` 并返回 `200`，响应通常包含 `source: "model"`、`faceDetected: true` 和 `usedOriginalImage: false`。
+- 上传清晰正脸时，Firestore 中新增对应诊断记录，页面可进入 `/result/{diagnosisId}` 并展示结果，历史记录页可以读取保存的数据。
+- 上传无人脸或无清晰人脸图片时，FastAPI 和 Next.js API 返回 `422 NO_CLEAR_FACE`，上传页停留并提示重新上传，Firestore 不新增诊断记录。
+- 上传动物、玩偶、卡通、风景、物体、多人合照或低质量/遮挡/逆光照片时，如未通过真人正脸质量守卫，同样返回 `422 NO_CLEAR_FACE`，不进入季型模型推理。

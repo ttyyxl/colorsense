@@ -32,6 +32,9 @@ export default function ResultPage({ params }: ResultPageProps) {
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [error, setError] = useState("");
   const season = diagnosis ? SEASONS[diagnosis.seasonType] : null;
+  const hasUnreliableFaceQuality = diagnosis?.faceDetected === false || diagnosis?.usedOriginalImage === true;
+  const hasVerifiedModelAnalysis =
+    diagnosis?.source === "model" && diagnosis.faceDetected === true && diagnosis.usedOriginalImage === false;
 
   useEffect(() => {
     let ignore = false;
@@ -91,6 +94,24 @@ export default function ResultPage({ params }: ResultPageProps) {
                 <h1 className="mt-2 text-2xl font-bold">色彩季型诊断结果</h1>
                 <p className="mt-3 text-sm text-indigo-100">Result ID: {id}</p>
               </header>
+              {hasUnreliableFaceQuality && (
+                <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-900">
+                  <p className="font-semibold">结果质量警告</p>
+                  <p className="mt-2 leading-7">
+                    未检测到清晰人脸，本次结果可能受背景、光线或图片整体色彩影响，建议重新上传自然光下的正脸照。
+                  </p>
+                </section>
+              )}
+              {diagnosis.source === "rules" && (
+                <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-slate-700">
+                  本次结果为基础色彩分析，不是完整模型人脸分析。
+                </section>
+              )}
+              {hasVerifiedModelAnalysis && (
+                <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
+                  AI 模型已基于人脸区域完成分析。
+                </section>
+              )}
               <SeasonCard season={season} confidence={diagnosis.confidence} />
               
               {diagnosis.aiAdvice && (
