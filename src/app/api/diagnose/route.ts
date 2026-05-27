@@ -35,7 +35,7 @@ interface InferenceResponse {
 }
 
 async function runInference(file: File): Promise<InferenceResponse> {
-  const inferenceUrl = process.env.INFERENCE_SERVICE_URL;
+  const inferenceUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.INFERENCE_SERVICE_URL;
 
   if (!inferenceUrl) {
     throw new Error("Inference service is not configured.");

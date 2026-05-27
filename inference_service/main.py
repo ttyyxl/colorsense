@@ -1,5 +1,7 @@
 import io
 import logging
+import os
+import traceback
 from time import perf_counter
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -15,6 +17,10 @@ from season_classifier import classify_season
 logger = logging.getLogger(__name__)
 
 
+def _trace(message: str) -> None:
+    print(f"[diagnose] {message}", flush=True)
+
+
 class LabFeatures(BaseModel):
     L: float
     a: float
@@ -23,9 +29,14 @@ class LabFeatures(BaseModel):
 
 app = FastAPI(title="ColorSense Inference Service")
 
+allowed_origins = ["http://localhost:3000"]
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "").rstrip("/")
+if frontend_origin and frontend_origin not in allowed_origins:
+    allowed_origins.append(frontend_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,10 +66,12 @@ def diagnose_lab(features: LabFeatures) -> dict[str, object]:
 @app.post("/diagnose")
 async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
     request_started_at = perf_counter()
+    _trace(f"Upload received filename={image.filename!r} content_type={image.content_type!r}")
     if image.content_type not in {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}:
         raise HTTPException(status_code=400, detail="仅支持 JPG、PNG、HEIC 或 WebP 图片")
 
     image_bytes = await image.read()
+    _trace(f"Upload bytes size={len(image_bytes)}")
 
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片不能超过 10MB")
@@ -69,10 +82,16 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
     except (UnidentifiedImageError, OSError, ValueError):
         raise HTTPException(status_code=400, detail="图片无法读取，请上传有效图片")
 
+    _trace(f"Pillow decoded image.size={original_image.size} image.mode={original_image.mode}")
     original_bgr = np.asarray(original_image)[:, :, ::-1].copy()
+    _trace(f"Numpy image shape={original_bgr.shape} format=BGR dtype={original_bgr.dtype}")
+    _trace("Entering face detection with encoded upload; detector decodes BGR and converts input to RGB for MediaPipe.")
     lab_features = extract_lab_features_from_bgr(original_bgr)
     face_confidence = 0.0
+    face_detected = False
+    used_original_image = True
     model_image = original_image
+    model_image_source = "original image"
 
     try:
         face_result = detect_face_and_extract_skin(image_bytes)
@@ -80,20 +99,20 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
             lab_features = face_result["lab_mean"]
             face_confidence = face_result["face_confidence"]
             model_image = Image.fromarray(face_result["face_rgb"])
+            face_detected = True
+            used_original_image = False
+            model_image_source = "face crop"
         else:
-            logger.warning(
-                "Face detection unavailable or unsuccessful (%s); using original image for model inference.",
-                face_result["error"],
-            )
-    except Exception:
-        logger.warning(
-            "Face detection failed unexpectedly; using original image for model inference.",
-            exc_info=True,
-        )
+            _trace(f"Face detection failed: {face_result['error']}; using original image for model inference.")
+    except Exception as exc:
+        _trace(f"Face detection failed: mediapipe_exception; using original image for model inference.")
+        _trace(f"exception type={type(exc).__name__} exception message={exc}")
+        traceback.print_exc()
 
     try:
         from model_inference import predict_season
 
+        _trace(f"Model input source={model_image_source} size={model_image.size} faceDetected={face_detected} usedOriginalImage={used_original_image}")
         inference_started_at = perf_counter()
         result = predict_season(model_image)
         logger.info(
@@ -101,8 +120,10 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
             result["source"],
             (perf_counter() - inference_started_at) * 1000,
         )
-    except Exception:
-        logger.warning("Model inference failed; falling back to LAB rules.", exc_info=True)
+    except Exception as exc:
+        _trace("Model inference failed; falling back to LAB rules.")
+        _trace(f"exception type={type(exc).__name__} exception message={exc}")
+        traceback.print_exc()
         result = {
             **classify_season(lab_features),
             "source": "rules",
@@ -115,7 +136,13 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object]:
         "source": result["source"],
         "lab_features": lab_features,
         "face_confidence": face_confidence,
+        "faceDetected": face_detected,
+        "usedOriginalImage": used_original_image,
     }
+    _trace(
+        f"Diagnosis response source={result['source']} faceDetected={face_detected} "
+        f"usedOriginalImage={used_original_image} face_confidence={face_confidence}"
+    )
     logger.info(
         "Diagnosis request completed source=%s duration_ms=%.1f.",
         result["source"],

@@ -1,4 +1,5 @@
 import type { SeasonType } from "./seasons";
+import type { DoubaoStyleAdvice } from "./ai";
 
 export interface LabFeatures {
   L: number;

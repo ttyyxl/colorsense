@@ -6,11 +6,6 @@ const apiKey = process.env.ARK_API_KEY || "";
 const baseURL = process.env.ARK_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3";
 const model = process.env.ARK_MODEL || "doubao-seed-2-0-pro-260215";
 
-const openai = new OpenAI({
-  apiKey,
-  baseURL,
-});
-
 export interface DoubaoStyleAdvice {
   title: string;
   summary: string;
@@ -29,6 +24,10 @@ export async function generateDoubaoStyleAdvice(userPrompt: string): Promise<Dou
   }
 
   try {
+    const openai = new OpenAI({
+      apiKey,
+      baseURL,
+    });
     const response = await openai.chat.completions.create({
       model,
       messages: [
