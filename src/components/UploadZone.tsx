@@ -9,6 +9,7 @@ import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传正面人像照片。";
+const MODEL_UNAVAILABLE_MESSAGE = "模型服务暂时不可用，请稍后重试。";
 
 export function UploadZone() {
   const router = useRouter();
@@ -35,6 +36,10 @@ export function UploadZone() {
   }
 
   function selectFile(nextFile?: File) {
+    if (isSubmitting) {
+      return;
+    }
+
     setError("");
     setNoClearFace(false);
 
@@ -103,6 +108,9 @@ export function UploadZone() {
           setError(NO_CLEAR_FACE_MESSAGE);
           return;
         }
+        if (!payload.success && payload.error === "MODEL_UNAVAILABLE") {
+          throw new Error(payload.message ?? MODEL_UNAVAILABLE_MESSAGE);
+        }
         throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
       }
 
@@ -130,31 +138,39 @@ export function UploadZone() {
         }`}
         onDragEnter={(event) => {
           event.preventDefault();
-          setIsDragging(true);
+          if (!isSubmitting) {
+            setIsDragging(true);
+          }
         }}
         onDragOver={(event) => event.preventDefault()}
         onDragLeave={() => setIsDragging(false)}
         onDrop={(event) => {
           event.preventDefault();
           setIsDragging(false);
-          selectFile(event.dataTransfer.files[0]);
+          if (!isSubmitting) {
+            selectFile(event.dataTransfer.files[0]);
+          }
         }}
       >
         <button
           type="button"
-          className="flex min-h-56 flex-col items-center justify-center rounded-xl bg-indigo-50 px-6 text-center transition hover:bg-indigo-100"
+          className="flex min-h-56 flex-col items-center justify-center rounded-xl bg-indigo-50 px-6 text-center transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
           onClick={() => inputRef.current?.click()}
+          disabled={isSubmitting}
         >
           <input
             ref={inputRef}
             className="sr-only"
             type="file"
             accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+            disabled={isSubmitting}
             onChange={(event) => selectFile(event.target.files?.[0])}
           />
           <Upload className="h-10 w-10 text-indigo-600" aria-hidden="true" />
           <span className="mt-4 text-lg font-semibold text-slate-950">拖拽或点击上传照片</span>
-          <span className="mt-2 max-w-md text-sm leading-6 text-slate-500">建议使用正面、自然光、无遮挡照片。支持 JPG、PNG、HEIC、WebP，最大 10MB。</span>
+          <span className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+            建议使用正面、自然光、无遮挡照片。支持 JPG、PNG、HEIC、WebP，最大 10MB。
+          </span>
         </button>
 
         <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">

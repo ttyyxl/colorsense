@@ -17,20 +17,36 @@ function initializeFirebaseAdmin() {
     .map(([key]) => key);
 
   if (missing.length) {
+    console.error("[firebase-admin] Missing service account configuration", {
+      missing,
+      firebaseProjectIdPresent: Boolean(firebaseAdminConfig.projectId),
+      firebaseClientEmailPresent: Boolean(firebaseAdminConfig.clientEmail),
+      firebasePrivateKeyPresent: Boolean(firebaseAdminConfig.privateKey),
+    });
     throw new Error(`Firebase Admin service account configuration is missing: ${missing.join(", ")}.`);
   }
 
   const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   const httpAgent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 
-  return admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: firebaseAdminConfig.projectId!,
-      clientEmail: firebaseAdminConfig.clientEmail!,
-      privateKey: firebaseAdminConfig.privateKey!,
-    }),
-    ...(httpAgent ? { httpAgent } : {}),
-  });
+  try {
+    return admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: firebaseAdminConfig.projectId!,
+        clientEmail: firebaseAdminConfig.clientEmail!,
+        privateKey: firebaseAdminConfig.privateKey!,
+      }),
+      ...(httpAgent ? { httpAgent } : {}),
+    });
+  } catch (error) {
+    console.error("[firebase-admin] Initialization failed", {
+      firebaseProjectIdPresent: Boolean(firebaseAdminConfig.projectId),
+      firebaseClientEmailPresent: Boolean(firebaseAdminConfig.clientEmail),
+      firebasePrivateKeyPresent: Boolean(firebaseAdminConfig.privateKey),
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error("Firebase Admin initialization failed. Check service account environment variables.");
+  }
 }
 
 export function getFirebaseAdminDebugState() {

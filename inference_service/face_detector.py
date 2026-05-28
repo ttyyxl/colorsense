@@ -12,6 +12,10 @@ MIN_FACE_CONFIDENCE = 0.80
 MIN_FACE_BOX_SIDE_RATIO = 0.12
 MIN_FACE_BOX_AREA_RATIO = 0.03
 
+# Production inference is strict-face-only. Detection failures must propagate
+# to /diagnose as 422 NO_CLEAR_FACE and must never fall back to the original
+# image for model inference.
+
 
 def _trace(message: str) -> None:
     print(f"[face-detection] {message}", flush=True)

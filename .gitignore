@@ -19,12 +19,19 @@
 
 # production
 /build
+dist/
 
 # misc
 .DS_Store
 *.pem
 serviceAccountKey.json
 firebase-adminsdk*.json
+logs/
+*.log
+uploads/
+tmp/
+temp/
+*.tmp
 
 # debug
 npm-debug.log*
@@ -41,6 +48,25 @@ venv/
 .venv/
 __pycache__/
 *.py[cod]
+checkpoints/
+*.ipynb_checkpoints/
+
+# training outputs
+colorsense-v3-kaggle-training-notebook.ipynb
+update_colorsense_v3_notebook.py
+ColorSense_AgentPrompt.md
+ColorSense_PRD_v1.docx
+inference_service/models/*history*.json
+inference_service/models/*metrics*.json
+inference_service/models/*report*.json
+inference_service/models/*predictions*.csv
+inference_service/models/*prediction*.json
+inference_service/models/*confusion_matrix*.png
+inference_service/models/*confusion_matrix*.csv
+inference_service/models/*crop*.csv
+inference_service/models/*split*.csv
+inference_service/models/*.ipynb
+inference_service/models/version1/
 
 # vercel
 .vercel

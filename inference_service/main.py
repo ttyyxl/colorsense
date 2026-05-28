@@ -27,6 +27,14 @@ class LabFeatures(BaseModel):
     b: float
 
 
+MODEL_UNAVAILABLE_RESPONSE = {
+    "success": False,
+    "error": "MODEL_UNAVAILABLE",
+    "code": "MODEL_UNAVAILABLE",
+    "message": "模型服务暂时不可用，请稍后重试。",
+}
+
+
 app = FastAPI(title="ColorSense Inference Service")
 
 allowed_origins = ["http://localhost:3000"]
@@ -164,13 +172,14 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object] | JSONRes
             (perf_counter() - inference_started_at) * 1000,
         )
     except Exception as exc:
-        _trace("Model inference failed; falling back to LAB rules.")
+        _trace("Model inference failed; aborting diagnosis without rules fallback.")
         _trace(f"exception type={type(exc).__name__} exception message={exc}")
         traceback.print_exc()
-        result = {
-            **classify_season(lab_features),
-            "source": "rules",
-        }
+        return JSONResponse(status_code=503, content=MODEL_UNAVAILABLE_RESPONSE)
+
+    if result.get("source") != "model":
+        _trace(f"Model returned non-model source={result.get('source')!r}; aborting diagnosis.")
+        return JSONResponse(status_code=503, content=MODEL_UNAVAILABLE_RESPONSE)
 
     response = {
         "season": result["season"],

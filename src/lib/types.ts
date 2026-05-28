@@ -84,6 +84,7 @@ export interface ApiSuccess<T> {
 export interface ApiError {
   success: false;
   error: string;
+  code?: string;
   message?: string;
   quality?: DiagnosisQuality;
 }
