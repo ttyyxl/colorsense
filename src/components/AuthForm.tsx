@@ -19,7 +19,20 @@ interface AuthFormProps {
   nextPath: string;
 }
 
-const verificationReturnUrl = `${(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/login?verified=1`;
+function getAppUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined" && window.location.origin) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "http://localhost:3000";
+}
+
+function getVerificationReturnUrl() {
+  return `${getAppUrl()}/login?verified=1`;
+}
 
 export function AuthForm({ nextPath }: AuthFormProps) {
   const router = useRouter();
@@ -98,7 +111,10 @@ export function AuthForm({ nextPath }: AuthFormProps) {
     setNotice(null);
     try {
       const credential = await createUserWithEmailAndPassword(auth!, email.trim(), password);
-      await sendEmailVerification(credential.user, { url: verificationReturnUrl });
+      await sendEmailVerification(credential.user, {
+        url: getVerificationReturnUrl(),
+        handleCodeInApp: false,
+      });
       setNotice({ type: "success", text: "验证邮件已发送。请打开邮箱并点击验证链接完成注册。" });
     } catch {
       setNotice({ type: "error", text: "注册失败。该邮箱可能已注册，或 Firebase 配置不可用。" });
