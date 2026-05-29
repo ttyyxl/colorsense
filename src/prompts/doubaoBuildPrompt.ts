@@ -12,6 +12,20 @@ export interface DoubaoInferenceData {
   style_desc: string;
 }
 
+export interface ReservedDoubaoUserProfilePromptContext {
+  summaryText?: string;
+  preferredStyles?: string[];
+  dailyScenes?: string[];
+  avoidedColors?: string[];
+  constraints?: string[];
+}
+
+// Phase 1 reserved only.
+// Do not include userProfile in active Doubao API calls until Phase 2 prompt integration is approved.
+export interface DoubaoInferenceDataWithReservedProfile extends DoubaoInferenceData {
+  userProfile?: ReservedDoubaoUserProfilePromptContext;
+}
+
 export function buildDoubaoUserPrompt(data: DoubaoInferenceData): string {
   return `Hi，我刚刚为你做完了详细的个人色彩分析，这是你的专属数据档案：
 

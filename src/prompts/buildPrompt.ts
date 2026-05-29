@@ -11,6 +11,20 @@ interface DiagnosisData {
   styleKeywords: string[];
 }
 
+export interface ReservedUserProfilePromptContext {
+  summaryText?: string;
+  preferredStyles?: string[];
+  dailyScenes?: string[];
+  avoidedColors?: string[];
+  constraints?: string[];
+}
+
+// Phase 1 reserved only.
+// Do not include userProfile in active AI API calls until Phase 2 prompt integration is approved.
+export interface DiagnosisPromptDataWithReservedProfile extends DiagnosisData {
+  userProfile?: ReservedUserProfilePromptContext;
+}
+
 export function buildUserPrompt(data: DiagnosisData): string {
   return "请根据以下色彩诊断数据，为用户生成一份个性化的穿搭建议报告：\n\n" +
     "# 诊断数据\n" +

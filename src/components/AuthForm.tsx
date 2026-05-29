@@ -34,6 +34,27 @@ function getVerificationReturnUrl() {
   return `${getAppUrl()}/login?verified=1`;
 }
 
+async function resolveNextPath(defaultPath: string) {
+  if (!auth?.currentUser) {
+    return defaultPath;
+  }
+
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/user-profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const payload = (await response.json()) as { success?: boolean; onboardingCompleted?: boolean };
+    if (payload.success && !payload.onboardingCompleted) {
+      return "/onboarding/style-profile";
+    }
+  } catch {
+    return defaultPath;
+  }
+
+  return defaultPath;
+}
+
 export function AuthForm({ nextPath }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -68,7 +89,7 @@ export function AuthForm({ nextPath }: AuthFormProps) {
           return;
         }
         if (currentUser.emailVerified) {
-          router.replace("/upload");
+          router.replace(await resolveNextPath("/upload"));
           router.refresh();
           return;
         }
@@ -137,7 +158,7 @@ export function AuthForm({ nextPath }: AuthFormProps) {
         setNotice({ type: "error", text: "请先前往邮箱完成验证。" });
         return;
       }
-      router.push(nextPath);
+      router.push(await resolveNextPath(nextPath));
       router.refresh();
     } catch {
       setNotice({ type: "error", text: "登录失败，请检查邮箱和密码。" });
@@ -155,7 +176,7 @@ export function AuthForm({ nextPath }: AuthFormProps) {
     setNotice(null);
     try {
       await signInWithPopup(auth!, new GoogleAuthProvider());
-      router.push(nextPath);
+      router.push(await resolveNextPath(nextPath));
       router.refresh();
     } catch {
       setNotice({ type: "error", text: "Google 登录失败，请稍后重试。" });
