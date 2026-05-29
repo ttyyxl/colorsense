@@ -67,6 +67,7 @@ export const AiOutputSchema = z.object({
 });
 
 export type AiOutput = z.infer<typeof AiOutputSchema>;
+export type DoubaoStyleAdvice = AiOutput;
 
 // --- Fallback JSON 模板 ---
 const FALLBACK_JSON_TEMPLATE = {
