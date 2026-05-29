@@ -1,4 +1,4 @@
-import { DoubaoStyleAdvice } from "@/lib/ai";
+import { type AiOutput as DoubaoStyleAdvice } from "@/lib/ai";
 import { Sparkles, Shirt, Palette, Scissors, Gem, Ban, Coffee } from "lucide-react";
 
 interface DoubaoAdviceSectionProps {
