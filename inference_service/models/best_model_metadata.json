@@ -1,0 +1,45 @@
+{
+  "selected_experiment": "efficientnet_b0_color",
+  "selection_metric": "test_macro_f1",
+  "selected_metrics": {
+    "experiment": "efficientnet_b0_color",
+    "base_model": "efficientnet_b0",
+    "use_color_features": true,
+    "best_epoch": 12,
+    "best_val_macro_f1": 0.5578339820853887,
+    "test_loss": 0.9815127755780418,
+    "test_accuracy": 0.6008583690987125,
+    "test_macro_f1": 0.5994484191967088,
+    "classes": [
+      "spring",
+      "summer",
+      "autumn",
+      "winter"
+    ],
+    "best_ckpt_path": "/kaggle/working/colorinsight_v5_full/models/efficientnet_b0_color/best_model.pth"
+  },
+  "classes": [
+    "spring",
+    "summer",
+    "autumn",
+    "winter"
+  ],
+  "class_to_idx": {
+    "spring": 0,
+    "summer": 1,
+    "autumn": 2,
+    "winter": 3
+  },
+  "idx_to_class": {
+    "0": "spring",
+    "1": "summer",
+    "2": "autumn",
+    "3": "winter"
+  },
+  "img_size": 224,
+  "confidence_policy": {
+    "low_confidence_threshold": 0.45,
+    "top2_gap_threshold": 0.08,
+    "message": "结果置信度较低，建议上传自然光下的正面清晰人像照片重新诊断。"
+  }
+}

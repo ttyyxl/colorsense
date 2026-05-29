@@ -1,7 +1,10 @@
 import io
+import json
 import logging
 import os
 import traceback
+from functools import lru_cache
+from pathlib import Path
 from time import perf_counter
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -11,10 +14,17 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
-from face_detector import MIN_FACE_CONFIDENCE, detect_face_and_extract_skin
+from face_detector import FACE_DETECTOR_MODEL_PATH, MIN_FACE_CONFIDENCE, detect_face_and_extract_skin
+from preprocess import load_backend_model, load_metadata, predict_one_crop
 from season_classifier import classify_season
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+
+BASE_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BASE_DIR / "models"
+MODEL_PATH = MODELS_DIR / "best_model.pth"
+METADATA_PATH = MODELS_DIR / "best_model_metadata.json"
 
 
 def _trace(message: str) -> None:
@@ -34,6 +44,8 @@ MODEL_UNAVAILABLE_RESPONSE = {
     "message": "模型服务暂时不可用，请稍后重试。",
 }
 
+LOW_CONFIDENCE_WARNING = "结果置信度较低，建议上传自然光下的正面清晰人像照片重新诊断。"
+
 
 app = FastAPI(title="ColorSense Inference Service")
 
@@ -51,8 +63,24 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    metadata = _read_model_metadata()
+    model_state = _get_model_state()
+    return {
+        "status": "ok" if model_state["modelLoaded"] else "degraded",
+        "modelReady": MODEL_PATH.exists() and METADATA_PATH.exists(),
+        "faceDetectorReady": FACE_DETECTOR_MODEL_PATH.exists(),
+        "modelLoaded": model_state["modelLoaded"],
+        "modelError": model_state["modelError"],
+        "modelPath": str(MODEL_PATH),
+        "metadataPath": str(METADATA_PATH),
+        "faceDetectorPath": str(FACE_DETECTOR_MODEL_PATH),
+        "selected_experiment": metadata.get("selected_experiment"),
+        "base_model": metadata.get("selected_metrics", {}).get("base_model"),
+        "use_color_features": metadata.get("selected_metrics", {}).get("use_color_features"),
+        "classes": metadata.get("classes"),
+        "confidence_policy": metadata.get("confidence_policy"),
+    }
 
 
 @app.post("/diagnose-lab")
@@ -69,6 +97,56 @@ def diagnose_lab(features: LabFeatures) -> dict[str, object]:
         "lab_features": features.model_dump(),
         "source": "rules",
     }
+
+
+def _read_model_metadata() -> dict[str, object]:
+    if not METADATA_PATH.exists():
+        return {}
+    try:
+        return load_metadata(METADATA_PATH)
+    except (OSError, json.JSONDecodeError) as exc:
+        _trace(f"Model metadata read failed type={type(exc).__name__} message={exc}")
+        return {}
+
+
+@lru_cache(maxsize=1)
+def _load_model_bundle():
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+    if not METADATA_PATH.exists():
+        raise FileNotFoundError(f"Model metadata file not found: {METADATA_PATH}")
+    model, ckpt, device = load_backend_model(MODEL_PATH)
+    metadata = load_metadata(METADATA_PATH)
+    return model, ckpt, device, metadata
+
+
+def _get_model_state() -> dict[str, object]:
+    try:
+        model, ckpt, device, metadata = _load_model_bundle()
+        return {
+            "modelLoaded": model is not None,
+            "modelError": None,
+            "device": str(device),
+            "checkpointBaseModel": ckpt.get("base_model"),
+            "checkpointUseColorFeatures": ckpt.get("use_color_features"),
+            "selectedExperiment": metadata.get("selected_experiment"),
+        }
+    except Exception as exc:
+        return {
+            "modelLoaded": False,
+            "modelError": f"{type(exc).__name__}: {exc}",
+            "device": None,
+            "checkpointBaseModel": None,
+            "checkpointUseColorFeatures": None,
+            "selectedExperiment": None,
+        }
+
+
+def _low_confidence_warning(metadata: dict[str, object]) -> str:
+    policy = metadata.get("confidence_policy")
+    if isinstance(policy, dict) and isinstance(policy.get("message"), str):
+        return policy["message"]
+    return LOW_CONFIDENCE_WARNING
 
 
 @app.post("/diagnose", response_model=None)
@@ -161,14 +239,19 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object] | JSONRes
     used_original_image = False
 
     try:
-        from model_inference import predict_season
-
-        _trace(f"Model input source=face crop size={model_image.size} faceDetected={face_detected} usedOriginalImage={used_original_image}")
+        model, ckpt, device, metadata = _load_model_bundle()
+        _trace(
+            "Model input source=face crop "
+            f"size={model_image.size} faceDetected={face_detected} "
+            f"usedOriginalImage={used_original_image} "
+            f"selected_experiment={metadata.get('selected_experiment')}"
+        )
         inference_started_at = perf_counter()
-        result = predict_season(model_image)
+        result = predict_one_crop(model_image, model, ckpt, device=device)
         logger.info(
-            "Model inference completed source=%s duration_ms=%.1f.",
-            result["source"],
+            "Model inference completed predicted_label=%s confidence=%.4f duration_ms=%.1f.",
+            result["predicted_label"],
+            result["confidence"],
             (perf_counter() - inference_started_at) * 1000,
         )
     except Exception as exc:
@@ -177,27 +260,44 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object] | JSONRes
         traceback.print_exc()
         return JSONResponse(status_code=503, content=MODEL_UNAVAILABLE_RESPONSE)
 
-    if result.get("source") != "model":
-        _trace(f"Model returned non-model source={result.get('source')!r}; aborting diagnosis.")
-        return JSONResponse(status_code=503, content=MODEL_UNAVAILABLE_RESPONSE)
+    season = str(result["predicted_label"])
+    confidence = float(result["confidence"])
+    scores = {
+        str(label): round(float(score), 6)
+        for label, score in dict(result["scores"]).items()
+    }
+    low_confidence = bool(result.get("low_confidence"))
 
     response = {
-        "season": result["season"],
-        "confidence": result["confidence"],
-        "scores": result["scores"],
-        "source": result["source"],
+        "season": season,
+        "confidence": round(confidence, 6),
+        "scores": scores,
+        "source": "model",
         "lab_features": lab_features,
         "face_confidence": face_confidence,
         "faceDetected": face_detected,
         "usedOriginalImage": used_original_image,
+        "predicted_label": season,
+        "predicted_idx": int(result["predicted_idx"]),
+        "top2_gap": round(float(result["top2_gap"]), 6),
+        "low_confidence": low_confidence,
+        "model_version": metadata.get("selected_metrics", {}).get("best_epoch"),
+        "selected_experiment": metadata.get("selected_experiment"),
+        "base_model": metadata.get("selected_metrics", {}).get("base_model", ckpt.get("base_model")),
+        "use_color_features": metadata.get("selected_metrics", {}).get("use_color_features", ckpt.get("use_color_features")),
     }
+    if low_confidence:
+        response["warning"] = _low_confidence_warning(metadata)
+
     _trace(
-        f"Diagnosis response source={result['source']} faceDetected={face_detected} "
+        f"Diagnosis response source=model predicted_label={season} "
+        f"confidence={confidence:.4f} top2_gap={float(result['top2_gap']):.4f} "
+        f"low_confidence={low_confidence} faceDetected={face_detected} "
         f"usedOriginalImage={used_original_image} face_confidence={face_confidence}"
     )
     logger.info(
         "Diagnosis request completed source=%s duration_ms=%.1f.",
-        result["source"],
+        "model",
         (perf_counter() - request_started_at) * 1000,
     )
     return response

@@ -13,6 +13,12 @@
 # testing
 /coverage
 
+# local sync/work folders
+hf-space-ColorSense-sync/
+apply_v3_crop_strategy_update.py
+MEMORY.md
+docs/brainstorm.md
+
 # next.js
 /.next/
 /out/
@@ -74,6 +80,9 @@ inference_service/models/*crop*.csv
 inference_service/models/*split*.csv
 inference_service/models/*.ipynb
 inference_service/models/version1/
+inference_service/models/version2/*
+!inference_service/models/version2/
+!inference_service/models/version2/blaze_face_short_range.tflite
 
 # vercel
 .vercel

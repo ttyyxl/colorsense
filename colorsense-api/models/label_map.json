@@ -1,0 +1,20 @@
+{
+  "class_names": [
+    "spring",
+    "summer",
+    "autumn",
+    "winter"
+  ],
+  "class_to_idx": {
+    "spring": 0,
+    "summer": 1,
+    "autumn": 2,
+    "winter": 3
+  },
+  "idx_to_class": {
+    "0": "spring",
+    "1": "summer",
+    "2": "autumn",
+    "3": "winter"
+  }
+}

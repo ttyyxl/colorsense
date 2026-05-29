@@ -8,7 +8,14 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from color_extractor import extract_lab_features_from_bgr
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
-FACE_DETECTOR_MODEL_PATH = MODELS_DIR / "blaze_face_short_range.tflite"
+FACE_DETECTOR_MODEL_CANDIDATES = [
+    MODELS_DIR / "blaze_face_short_range.tflite",
+    MODELS_DIR / "version2" / "blaze_face_short_range.tflite",
+]
+FACE_DETECTOR_MODEL_PATH = next(
+    (path for path in FACE_DETECTOR_MODEL_CANDIDATES if path.exists()),
+    FACE_DETECTOR_MODEL_CANDIDATES[0],
+)
 CANDIDATE_MIN_DETECTION_CONFIDENCE = 0.55
 MIN_FACE_CONFIDENCE = 0.80
 MIN_FACE_BOX_SIDE_RATIO = 0.12
