@@ -109,6 +109,26 @@ export function DoubaoAdviceSection({ advice }: DoubaoAdviceSectionProps) {
             ))}
           </ul>
         </div>
+
+        {/* 明星穿搭灵感 */}
+        {advice.celebrity_recommendations && advice.celebrity_recommendations.length > 0 && (
+          <div className="group rounded-2xl bg-slate-50/50 p-6 transition-all border border-transparent hover:border-violet-100">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-xl bg-violet-100/50 p-2 text-violet-600">
+                <Coffee className="h-5 w-5" /> {/* Reusing Coffee icon for now, could be changed later */}
+              </div>
+              <h3 className="font-bold text-slate-900">明星穿搭灵感</h3>
+            </div>
+            <ul className="space-y-3">
+              {advice.celebrity_recommendations.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-600 leading-relaxed">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* 避雷指南 SOS */}

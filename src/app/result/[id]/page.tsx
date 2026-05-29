@@ -118,9 +118,6 @@ export default function ResultPage({ params }: ResultPageProps) {
                 <AiAdviceSection advice={diagnosis.aiAdvice} />
               )}
 
-              {diagnosis.doubaoAdvice && (
-                <DoubaoAdviceSection advice={diagnosis.doubaoAdvice} />
-              )}
 
               {diagnosis.scores && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -165,6 +162,9 @@ export default function ResultPage({ params }: ResultPageProps) {
                 <p className="mt-5 text-sm text-slate-500">谨慎使用：{diagnosis.avoidColors.join(" / ")}</p>
                 <p className="mt-3 text-sm text-slate-500">生成时间：{new Date(diagnosis.createdAt).toLocaleString("zh-CN")}</p>
               </section>
+              {diagnosis.doubaoAdvice && (
+                <DoubaoAdviceSection advice={diagnosis.doubaoAdvice} />
+              )}
             </div>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
               <ShareModal diagnosisId={id} cardRef={cardRef} />
