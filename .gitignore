@@ -39,13 +39,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env
-.env.local
-.env.production
-.env.development
-
-# Keep .env.example if it exists
+# env files (can opt-in for committing if needed)
+.env*
 !.env.example
 
 # Sensitive files and keys
@@ -63,17 +58,7 @@ __pycache__/
 checkpoints/
 *.ipynb_checkpoints/
 
-# large training outputs and temporary images/logs
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.svg
-*.webp
-*.out
-
-# specific training outputs (from original .gitignore)
+# training outputs
 colorsense-v3-kaggle-training-notebook.ipynb
 update_colorsense_v3_notebook.py
 ColorSense_AgentPrompt.md
