@@ -18,11 +18,14 @@ export async function POST(req: NextRequest) {
 
     console.info("[api/generate-style] Generating Doubao advice for:", data.season);
 
-    // 构建 Prompt
-    const userPrompt = buildDoubaoUserPrompt(data);
-
-    // 调用豆包模型
-    const advice = await generateDoubaoStyleAdvice(userPrompt);
+    const advice = await generateDoubaoStyleAdvice({
+      season: data.season,
+      confidence: data.confidence || 0.8,
+      lab_features: data.lab_features,
+      recommended_colors: data.recommended_colors || [],
+      avoid_colors: data.avoid_colors || [],
+      keywords: data.keywords || [],
+    });
 
     return NextResponse.json({
       success: true,
