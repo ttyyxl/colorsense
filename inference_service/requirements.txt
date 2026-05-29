@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+mediapipe==0.10.35
+opencv-python-headless
+pillow
+numpy
+scikit-learn
+onnxruntime
+torch
+torchvision

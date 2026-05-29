@@ -1,0 +1,100 @@
+{
+  "architecture": "efficientnet_b0",
+  "num_classes": 4,
+  "class_names": [
+    "spring",
+    "summer",
+    "autumn",
+    "winter"
+  ],
+  "class_to_idx": {
+    "spring": 0,
+    "summer": 1,
+    "autumn": 2,
+    "winter": 3
+  },
+  "idx_to_class": {
+    "0": "spring",
+    "1": "summer",
+    "2": "autumn",
+    "3": "winter"
+  },
+  "image_size": 224,
+  "resize_size": 224,
+  "imagenet_mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "imagenet_std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "trained_input_type": "face_crop",
+  "face_crop_scale": 1.35,
+  "crop_failed_policy": "fallback_original",
+  "production_input_policy": "strict_face_only",
+  "production_allows_original_fallback": false,
+  "production_note": "This is a temporary face-crop model artifact. Historical training metadata records crop_failed_policy=fallback_original, but production inference now rejects unclear/no-face images with 422 NO_CLEAR_FACE and never sends the original image to the model. v3 training should exclude detection-failed samples and use pure face crop / skin mask inputs.",
+  "train_transform": {
+    "Resize": [
+      256,
+      256
+    ],
+    "RandomResizedCrop": {
+      "size": 224,
+      "scale": [
+        0.85,
+        1.0
+      ],
+      "ratio": [
+        0.9,
+        1.1
+      ]
+    },
+    "RandomHorizontalFlip": 0.5,
+    "RandomRotation": 5,
+    "ColorJitter": {
+      "brightness": 0.08,
+      "contrast": 0.08,
+      "saturation": 0.05,
+      "hue": 0.01
+    },
+    "Normalize": {
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    }
+  },
+  "eval_transform": {
+    "Resize": [
+      224,
+      224
+    ],
+    "Normalize": {
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    }
+  },
+  "best_model_file": "best_model_facecrop.pth",
+  "metrics_file": "metrics_facecrop.json",
+  "classification_report_file": "classification_report_facecrop.json",
+  "prediction_distribution_file": "prediction_distribution_facecrop.json",
+  "per_sample_predictions_file": "per_sample_predictions_facecrop.csv"
+}

@@ -1,0 +1,98 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+dist/
+
+# misc
+.DS_Store
+*.pem
+serviceAccountKey.json
+firebase-adminsdk*.json
+logs/
+*.log
+uploads/
+tmp/
+temp/
+*.tmp
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env.local
+.env.production
+.env.development
+
+# Keep .env.example if it exists
+!.env.example
+
+# Sensitive files and keys
+*.key
+*.pem
+*.secret
+*.token
+*.password
+
+# python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+checkpoints/
+*.ipynb_checkpoints/
+
+# large training outputs and temporary images/logs
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.svg
+*.webp
+*.out
+
+# specific training outputs (from original .gitignore)
+colorsense-v3-kaggle-training-notebook.ipynb
+update_colorsense_v3_notebook.py
+ColorSense_AgentPrompt.md
+ColorSense_PRD_v1.docx
+inference_service/models/*history*.json
+inference_service/models/*metrics*.json
+inference_service/models/*report*.json
+inference_service/models/*predictions*.csv
+inference_service/models/*prediction*.json
+inference_service/models/*confusion_matrix*.png
+inference_service/models/*confusion_matrix*.csv
+inference_service/models/*crop*.csv
+inference_service/models/*split*.csv
+inference_service/models/*.ipynb
+inference_service/models/version1/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
