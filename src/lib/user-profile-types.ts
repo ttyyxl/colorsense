@@ -43,6 +43,7 @@ export interface UserStyleProfilePromptFields {
   styleTendency: string[];
   stylePreferences: string[];
   makeupPreferences: string[];
+  favoriteColors: string[];
 }
 
 export interface UserStyleProfilePromptContext {
