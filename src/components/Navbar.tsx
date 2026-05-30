@@ -49,14 +49,14 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-[#81bfe9]/20 bg-white/62 backdrop-blur-[20px]">
+    <header className="border-b border-[#81bfe9]/14 bg-white/48 backdrop-blur-[20px]">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="text-xl font-bold text-[#181698]">
           ColorSense
         </Link>
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-1.5 md:flex">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="rounded-full px-3 py-2 text-sm font-medium text-[#667694] hover:bg-[#eef6ff] hover:text-[#181698]">
+            <Link key={item.href} href={item.href} className="rounded-xl px-3 py-2 text-sm font-medium text-[#667694]/75 hover:bg-white/48 hover:text-[#181698]">
               {item.label}
             </Link>
           ))}
@@ -65,7 +65,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setMenuOpen((value) => !value)}
-                className="flex max-w-56 items-center gap-2 rounded-full border border-[#81bfe9]/24 bg-white/72 px-3 py-2 text-sm font-semibold text-[#181698] shadow-sm hover:bg-[#eef6ff]"
+                className="flex max-w-56 items-center gap-2 rounded-xl border border-[#81bfe9]/22 bg-white/46 px-3 py-2 text-sm font-semibold text-[#181698] shadow-sm hover:bg-white/66"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >
@@ -104,12 +104,12 @@ export function Navbar() {
               )}
             </div>
           ) : (
-            <Link href="/login" className="rounded-full bg-[#578af4] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(87,138,244,0.24)] hover:bg-[#181698]">
+            <Link href="/login" className="rounded-xl border border-[#81bfe9]/28 bg-white/38 px-4 py-2 text-sm font-semibold text-[#181698] shadow-sm hover:bg-white/66">
               登录
             </Link>
           )}
         </div>
-        <Link href="/upload" className="rounded-full bg-[#578af4] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(87,138,244,0.24)] md:hidden">
+        <Link href="/upload" className="rounded-xl border border-[#81bfe9]/28 bg-white/46 px-4 py-2 text-sm font-semibold text-[#181698] shadow-sm md:hidden">
           开始诊断
         </Link>
       </nav>

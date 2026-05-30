@@ -10,8 +10,8 @@
   --color-primary-light: #addce6;
   --color-text-muted: #bcc6d7;
   --surface-glass: rgba(255, 255, 255, 0.72);
-  --border-lux: rgba(129, 191, 233, 0.25);
-  --shadow-soft: 0 30px 70px -20px rgba(24, 22, 152, 0.16);
+  --border-lux: rgba(129, 191, 233, 0.22);
+  --shadow-soft: 0 30px 70px -20px rgba(24, 22, 152, 0.06);
   --glass-bg: rgba(255, 255, 255, 0.58);
   --glass-bg-strong: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(129, 191, 233, 0.28);
