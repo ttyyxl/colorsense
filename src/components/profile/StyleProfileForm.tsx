@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useState } from "react";
+import Sketch from "@uiw/react-color-sketch";
+import { hsvaToHslaString } from "@uiw/color-convert";
 import { auth } from "@/lib/firebase";
 import type { UserStyleProfile, UserStyleProfileInput } from "@/lib/user-profile-types";
 
@@ -14,6 +16,17 @@ const EYE_COLOR_OPTIONS = ["黑色", "深棕", "浅棕", "琥珀色", "灰色", 
 const HAIR_COLOR_OPTIONS = ["黑色", "深棕", "浅棕", "染发浅色", "染发红 / 橘", "染发冷色", "不确定"];
 const STYLE_OPTIONS = ["简约", "韩系", "通勤", "欧美", "甜美", "运动", "复古", "法式", "日系", "中性", "其他"];
 const MAKEUP_OPTIONS = ["裸妆", "通勤妆", "甜美妆", "欧美妆", "氛围感妆", "浓颜妆", "不常化妆", "其他"];
+
+const COMMON_COLORS = [
+  { name: "黑色", shades: ["black","bg-gray-100", "bg-gray-300", "bg-gray-500", "bg-gray-700"] },
+  { name: "白色", shades: ["white","bg-stone-100", "bg-stone-200", "bg-stone-300", "bg-stone-400"] },
+  { name: "棕色", shades: ["bg-amber-200", "bg-amber-300", "bg-amber-500", "bg-amber-700", "bg-amber-900"] },
+  { name: "红色", shades: ["bg-red-100", "bg-red-300", "bg-red-500", "bg-red-700", "bg-red-900"] },
+  { name: "黄色", shades: ["bg-yellow-100", "bg-yellow-300", "bg-yellow-400", "bg-yellow-500", "bg-yellow-700"] },
+  { name: "绿色", shades: ["bg-green-100", "bg-green-300", "bg-green-500", "bg-green-700", "bg-green-900"] },
+  { name: "蓝色", shades: ["bg-blue-100", "bg-blue-300", "bg-blue-500", "bg-blue-700", "bg-blue-900"] },
+  { name: "紫色", shades: ["bg-purple-100", "bg-purple-300", "bg-purple-500", "bg-purple-700", "bg-purple-900"] },
+];
 const EXTERNAL_FEATURE_GROUPS = [
   {
     key: "faceContour",
@@ -51,6 +64,7 @@ const EMPTY_PROFILE: UserStyleProfileInput = {
     stylePreferenceOther: "",
     makeupPreferences: [],
     makeupPreferenceOther: "",
+    favoriteColors: [],
   },
   externalFeatures: {
     faceContour: [],
@@ -84,6 +98,7 @@ function toInputProfile(profile: UserStyleProfile | null): UserStyleProfileInput
       ...profile.optionalInfo,
       stylePreferences: profile.optionalInfo?.stylePreferences ?? [],
       makeupPreferences: profile.optionalInfo?.makeupPreferences ?? [],
+      favoriteColors: profile.optionalInfo?.favoriteColors ?? [],
     },
     externalFeatures: {
       ...EMPTY_PROFILE.externalFeatures,
@@ -361,6 +376,11 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
               onChange={(makeupPreferenceOther) => setProfile({ ...profile, optionalInfo: { ...profile.optionalInfo, makeupPreferenceOther } })}
             />
           )}
+          <FavoriteColorPicker
+            label="喜好颜色"
+            values={profile.optionalInfo.favoriteColors ?? []}
+            onChange={(favoriteColors) => setProfile({ ...profile, optionalInfo: { ...profile.optionalInfo, favoriteColors } })}
+          />
         </div>
       </section>
 
@@ -489,6 +509,104 @@ function CheckboxGroup({ label, options, values, onChange }: { label: string; op
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+const getDisplayColorName = (value: string) => {
+  if (value === "black") return "黑色";
+  if (value === "white") return "白色";
+
+  for (const group of COMMON_COLORS) {
+    if (group.shades.includes(value)) {
+      return group.name;
+    }
+  }
+  return value;
+};
+
+interface FavoriteColorPickerProps {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+}
+
+function FavoriteColorPicker({ label, values, onChange }: FavoriteColorPickerProps) {
+  const [clickedColorName, setClickedColorName] = useState<string | null>(null);
+  const [hsva, setHsva] = useState({ h: 0, s: 0, v: 80, a: 1 });
+
+  const handleColorClick = (colorName: string) => {
+    const newValues = updateList(values, colorName, !values.includes(colorName));
+    onChange(newValues);
+    setClickedColorName(getDisplayColorName(colorName));
+    setTimeout(() => setClickedColorName(null), 2000);
+  };
+
+  const handleAddColorFromPicker = () => {
+    const hexColor = hsvaToHslaString(hsva);
+    if (!values.includes(hexColor)) {
+      onChange([...values, hexColor]);
+    }
+    setClickedColorName(hexColor);
+    setTimeout(() => setClickedColorName(null), 2000);
+  };
+
+  const handleRemoveCustomColor = (colorToRemove: string) => {
+    onChange(values.filter((color) => color !== colorToRemove));
+  };
+
+  return (
+    <div>
+      <p className="mb-3 text-sm font-semibold text-slate-700">{label}</p>
+      <div className="flex flex-wrap gap-6">
+        {COMMON_COLORS.map((colorGroup) => (
+          <div key={colorGroup.name} className="flex flex-col items-center">
+            <p className="mb-2 text-sm font-semibold text-slate-700">{colorGroup.name}</p>
+            <div className="flex flex-col gap-2">
+              {colorGroup.shades.map((shadeValue) => {
+                const isSelected = values.includes(shadeValue);
+                const displayColorName = `${colorGroup.name} (${shadeValue.replace('bg-', '')})`;
+
+                return (
+                  <div
+                    key={shadeValue}
+                    className={`w-8 h-8 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-110
+                      ${shadeValue === "white" || shadeValue === "black" ? "border border-slate-300" : ""}
+                      ${isSelected ? "ring-2 ring-offset-2 ring-indigo-500" : ""}`}
+                    style={{ backgroundColor: shadeValue.startsWith("bg-") ? undefined : shadeValue }}
+                    onClick={() => handleColorClick(shadeValue)}
+                    title={displayColorName}
+                  >
+                    {shadeValue.startsWith("bg-") && shadeValue !== "black" && shadeValue !== "white" && (
+                      <div className={`${shadeValue} w-full h-full rounded-full`}></div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <Sketch
+           color={hsva}
+             onChange={(color) => setHsva(color.hsva)}
+        />
+        <button
+          type="button"
+          onClick={handleAddColorFromPicker}
+          className="mt-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+        >
+          添加选定颜色 ({hsvaToHslaString(hsva)})
+        </button>
+      </div>
+
+      {clickedColorName && (
+        <p className="mt-2 text-sm text-slate-600">已选择颜色: {clickedColorName}</p>
+      )}
+
+      
     </div>
   );
 }

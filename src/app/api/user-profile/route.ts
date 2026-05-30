@@ -44,6 +44,7 @@ function normalizeProfileInput(payload: unknown): UserStyleProfileInput {
       stylePreferenceOther: asString(optionalInfo.stylePreferenceOther),
       makeupPreferences: asStringList(optionalInfo.makeupPreferences),
       makeupPreferenceOther: asString(optionalInfo.makeupPreferenceOther),
+      favoriteColors: asStringList(optionalInfo.favoriteColors),
     },
     externalFeatures: {
       faceContour: asStringList(externalFeatures.faceContour),
@@ -136,6 +137,11 @@ export async function PUT(request: Request) {
         },
         { merge: true },
       );
+    });
+
+    // Asynchronously trigger AI profile advice generation
+    void fetch("/api/generate-profile-advice", {
+      method: "POST",
     });
   } catch (error) {
     console.error("[user-profile] save failed", {

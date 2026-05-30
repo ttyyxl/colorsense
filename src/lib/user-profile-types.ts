@@ -1,3 +1,5 @@
+import { ProfileOutput } from "@/lib/ai";
+
 export interface UserQuestionnaireRequiredInfo {
   gender?: string;
   genderOther?: string;
@@ -14,6 +16,7 @@ export interface UserQuestionnaireOptionalInfo {
   stylePreferenceOther?: string;
   makeupPreferences: string[];
   makeupPreferenceOther?: string;
+  favoriteColors?: string[];
 }
 
 export interface UserQuestionnaireExternalFeatures {
@@ -55,6 +58,7 @@ export interface UserStyleProfile {
   styleTendency: UserQuestionnaireStyleTendency;
   aiPromptReady: boolean;
   promptContext: UserStyleProfilePromptContext;
+  generatedProfileAdvice?: ProfileOutput; // Add this line
   createdAt?: unknown;
   updatedAt?: unknown;
 }

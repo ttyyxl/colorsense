@@ -29,7 +29,9 @@ export function buildUserProfilePromptContext(profile: UserStyleProfileInput): U
     profile.optionalInfo.makeupPreferences,
     profile.optionalInfo.makeupPreferenceOther,
   );
-
+  const favoriteColors = cleanList(
+    profile.optionalInfo.favoriteColors,
+  );
   const gender = profile.requiredInfo.gender === "其他"
     ? cleanValue(profile.requiredInfo.genderOther)
     : cleanValue(profile.requiredInfo.gender);
@@ -50,6 +52,7 @@ export function buildUserProfilePromptContext(profile: UserStyleProfileInput): U
     styleTendency: listOrFallback(styleTendency),
     stylePreferences: listOrFallback(stylePreferences),
     makeupPreferences: listOrFallback(makeupPreferences),
+    favoriteColors: listOrFallback(favoriteColors),
   };
 
   const summaryText = [
@@ -65,6 +68,7 @@ export function buildUserProfilePromptContext(profile: UserStyleProfileInput): U
     `风格倾向：${promptFields.styleTendency.join("、")}`,
     `穿搭偏好：${promptFields.stylePreferences.join("、")}`,
     `妆容偏好：${promptFields.makeupPreferences.join("、")}`,
+    `喜好颜色：${promptFields.favoriteColors.join("、")}`,
   ].join("\n");
 
   return {
@@ -76,6 +80,7 @@ export function buildUserProfilePromptContext(profile: UserStyleProfileInput): U
       ...styleTendency,
       ...stylePreferences,
       ...makeupPreferences,
+      ...favoriteColors,
       promptFields.gender,
       promptFields.ageRange,
       promptFields.dailyScene,
