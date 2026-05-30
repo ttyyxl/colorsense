@@ -2,25 +2,45 @@
 
 import { Camera, Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
-const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传正面人像照片。";
+const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传或拍摄正面人像照片。";
 const MODEL_UNAVAILABLE_MESSAGE = "模型服务暂时不可用，请稍后重试。";
 
 export function UploadZone() {
   const router = useRouter();
   const { currentUser } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [noClearFace, setNoClearFace] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCameraStarting, setIsCameraStarting] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOpen(false);
+    setIsCameraStarting(false);
+  }
 
   function resetSelectedImage() {
     if (previewUrl) {
@@ -47,6 +67,8 @@ export function UploadZone() {
       return;
     }
 
+    stopCamera();
+
     if (!ALLOWED_TYPES.has(nextFile.type)) {
       setError("仅支持 JPG、PNG、HEIC 或 WebP 图片。");
       return;
@@ -64,6 +86,87 @@ export function UploadZone() {
     }
 
     setPreviewUrl(URL.createObjectURL(nextFile));
+  }
+
+  async function startCamera() {
+    if (isSubmitting || isCameraStarting) {
+      return;
+    }
+
+    setError("");
+    setNoClearFace(false);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("当前设备不支持拍照，请改为上传图片。");
+      return;
+    }
+
+    setIsCameraStarting(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setIsCameraOpen(true);
+
+      window.requestAnimationFrame(() => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          void videoRef.current.play();
+        }
+      });
+    } catch (err) {
+      stopCamera();
+      const name = err instanceof DOMException ? err.name : "";
+      setError(
+        name === "NotAllowedError" || name === "PermissionDeniedError"
+          ? "无法访问摄像头，请检查浏览器权限或改为上传照片。"
+          : "摄像头打开失败，请改为上传照片。",
+      );
+    } finally {
+      setIsCameraStarting(false);
+    }
+  }
+
+  async function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || !streamRef.current) {
+      setError("摄像头尚未准备好，请稍后再试。");
+      return;
+    }
+
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+
+    if (!width || !height) {
+      setError("摄像头画面尚未加载完成，请稍后再拍摄。");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      setError("拍照失败，请改为上传照片。");
+      return;
+    }
+
+    context.drawImage(video, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    });
+
+    if (!blob) {
+      setError("拍照失败，请改为上传照片。");
+      return;
+    }
+
+    selectFile(new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" }));
   }
 
   async function submitDiagnosis() {
@@ -152,12 +255,7 @@ export function UploadZone() {
           }
         }}
       >
-        <button
-          type="button"
-          className="flex min-h-56 flex-col items-center justify-center rounded-xl bg-indigo-50 px-6 text-center transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={() => inputRef.current?.click()}
-          disabled={isSubmitting}
-        >
+        <div className="flex min-h-56 flex-col items-center justify-center rounded-xl bg-indigo-50 px-6 py-6 text-center">
           <input
             ref={inputRef}
             className="sr-only"
@@ -171,10 +269,52 @@ export function UploadZone() {
           <span className="mt-2 max-w-md text-sm leading-6 text-slate-500">
             建议使用正面、自然光、无遮挡照片。支持 JPG、PNG、HEIC、WebP，最大 10MB。
           </span>
-        </button>
+          <div className="mt-5 grid w-full gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              onClick={() => inputRef.current?.click()}
+              disabled={isSubmitting}
+            >
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              上传照片
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={startCamera}
+              disabled={isSubmitting || isCameraStarting}
+            >
+              {isCameraStarting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Camera className="h-4 w-4" aria-hidden="true" />}
+              拍照
+            </button>
+          </div>
+        </div>
 
         <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          {previewUrl ? (
+          {isCameraOpen ? (
+            <div className="flex h-full w-full flex-col gap-3 p-3">
+              <video ref={videoRef} className="min-h-52 w-full rounded-xl bg-slate-900 object-contain" playsInline muted />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-300"
+                >
+                  拍摄
+                </button>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  disabled={isSubmitting}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="上传照片预览" className="h-full max-h-80 w-full object-contain" />
           ) : (

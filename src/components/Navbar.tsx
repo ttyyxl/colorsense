@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, FileUser, History, LogOut, Settings, UserCircle } from "lucide-react";
+import { ChevronDown, FileUser, History, LogOut, Settings, Sparkles, UserCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 
 const navItems = [
   { href: "/upload", label: "开始诊断" },
+  { href: "/outfit", label: "穿搭灵感" },
   { href: "/history", label: "历史记录" },
 ];
 
@@ -89,6 +90,7 @@ export function Navbar() {
                   </div>
                   <div className="p-2">
                     <AccountMenuLink href="/profile/portrait" label="查看个人肖像档案" icon={<FileUser className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
+                    <AccountMenuLink href="/outfit" label="今日 OOTD" icon={<Sparkles className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
                     <AccountMenuLink href="/history" label="历史诊断记录" icon={<History className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
                     <button
                       type="button"

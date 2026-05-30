@@ -9,7 +9,7 @@ function canUseProtectedPages(providerIds: string[], emailVerified: boolean) {
 }
 
 function requiresCompletedQuestionnaire(pathname: string) {
-  return ["/upload", "/history", "/processing", "/result"].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return ["/upload", "/history", "/processing", "/result", "/outfit"].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {

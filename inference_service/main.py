@@ -45,6 +45,7 @@ MODEL_UNAVAILABLE_RESPONSE = {
 }
 
 LOW_CONFIDENCE_WARNING = "结果置信度较低，建议上传自然光下的正面清晰人像照片重新诊断。"
+NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传或拍摄正面人像照片。"
 
 
 app = FastAPI(title="ColorSense Inference Service")
@@ -224,10 +225,10 @@ async def diagnose(image: UploadFile = File(...)) -> dict[str, object] | JSONRes
             status_code=422,
             content={
                 "error": "NO_CLEAR_FACE",
-                "message": "未检测到清晰人脸，请在自然光下上传正面人像照片后重试。",
+                "message": NO_CLEAR_FACE_MESSAGE,
                 "quality": {
-                    "faceDetected": False,
-                    "usedOriginalImage": True,
+                    "faceDetected": bool(face_result.get("faceDetected") is True),
+                    "usedOriginalImage": bool(face_result.get("usedOriginalImage") is not False),
                     "faceConfidence": face_confidence,
                 },
             },

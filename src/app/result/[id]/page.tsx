@@ -166,13 +166,16 @@ export default function ResultPage({ params }: ResultPageProps) {
                 <DoubaoAdviceSection advice={diagnosis.doubaoAdvice} />
               )}
             </div>
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="mt-6 grid gap-3 md:grid-cols-4">
               <ShareModal diagnosisId={id} cardRef={cardRef} />
               <Link href="/upload" className="rounded-2xl border border-indigo-100 bg-white p-5 font-semibold text-indigo-700">
                 重新诊断
               </Link>
               <Link href="/history" className="rounded-2xl border border-indigo-100 bg-white p-5 font-semibold text-indigo-700">
                 查看历史
+              </Link>
+              <Link href="/outfit" className="rounded-2xl border border-purple-100 bg-white p-5 font-semibold text-purple-700">
+                生成今日 OOTD
               </Link>
             </div>
           </>

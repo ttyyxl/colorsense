@@ -17,6 +17,10 @@ const features = [
     title: "个性风格建议",
     description: "为中文用户生成更自然的穿搭说明，适合保存和分享。",
   },
+  {
+    title: "今日 OOTD",
+    description: "结合季型、个人档案、场景、心情和天气，生成可以直接照着穿的今日灵感。",
+  },
 ];
 
 export default function Home() {
@@ -49,6 +53,12 @@ export default function Home() {
             >
               查看历史
             </Link>
+            <Link
+              href="/outfit"
+              className="rounded-xl border border-purple-200 bg-white px-6 py-3 font-semibold text-purple-700 transition hover:bg-purple-50"
+            >
+              今日 OOTD
+            </Link>
           </div>
         </div>
         <div className="rounded-3xl border border-indigo-100 bg-white/80 p-5 shadow-xl shadow-indigo-100">
@@ -59,7 +69,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-4 px-6 pb-16 md:grid-cols-3">
+      <section className="mx-auto grid max-w-6xl gap-4 px-6 pb-16 md:grid-cols-4">
         {features.map((feature) => (
           <article key={feature.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-950">{feature.title}</h2>

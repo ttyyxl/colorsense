@@ -1,3 +1,12 @@
+---
+title: ColorSense
+emoji: "🎨"
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # ColorSense API
 
 Standalone FastAPI inference backend for local development and Hugging Face Spaces Docker deployment.

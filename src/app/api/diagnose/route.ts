@@ -14,6 +14,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const INFERENCE_TIMEOUT_MS = 60_000;
 const MIN_FACE_CONFIDENCE = 0.8;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传或拍摄正面人像照片。";
 
 class InferenceTimeoutError extends Error {
   constructor() {
@@ -108,7 +109,7 @@ async function runInference(file: File): Promise<InferenceResponse> {
     const payload = (await response.json().catch(() => ({}))) as InferenceErrorResponse;
     if (response.status === 422 && payload.error === "NO_CLEAR_FACE") {
       throw new NoClearFaceError(
-        payload.message ?? "未检测到清晰人脸，请在自然光下上传正面人像照片后重试。",
+        payload.message ?? NO_CLEAR_FACE_MESSAGE,
         payload.quality ?? { faceDetected: false, usedOriginalImage: true, faceConfidence: 0 },
       );
     }
@@ -172,7 +173,7 @@ export async function POST(request: Request) {
       typeof faceConfidence !== "number" ||
       faceConfidence < MIN_FACE_CONFIDENCE
     ) {
-      throw new NoClearFaceError("未检测到清晰人脸，请在自然光下上传正面人像照片后重试。", {
+      throw new NoClearFaceError(NO_CLEAR_FACE_MESSAGE, {
         faceDetected: faceDetected ?? false,
         usedOriginalImage: usedOriginalImage ?? true,
         faceConfidence: faceConfidence ?? 0,
