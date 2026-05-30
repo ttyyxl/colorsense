@@ -10,8 +10,8 @@ interface ShareModalProps {
 }
 
 export function ShareModal({ diagnosisId, cardRef }: ShareModalProps) {
-  const [message, setMessage] = useState("把当前结果卡片保存为 PNG，方便发给朋友或留档。");
   const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function saveCard() {
     const card = cardRef.current;
@@ -76,16 +76,18 @@ export function ShareModal({ diagnosisId, cardRef }: ShareModalProps) {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <p className="font-semibold text-slate-950">保存结果卡片</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
-      <button
-        type="button"
-        className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-        disabled={isSaving}
-        onClick={saveCard}
+      <div
+        className={`font-semibold text-indigo-700 ${isSaving ? "opacity-50 cursor-wait" : "cursor-pointer hover:text-indigo-700"}`}
+        onClick={!isSaving ? saveCard : undefined}
       >
-        {isSaving ? "正在保存..." : "下载 PNG"}
-      </button>
+        保存结果卡片
+        {isSaving && <span className="ml-2 text-sm text-slate-500">正在保存...</span>}
+      </div>
+      {message && (
+        <p className={`mt-3 text-sm ${message.includes("失败") ? "text-red-600" : "text-green-600"}`}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

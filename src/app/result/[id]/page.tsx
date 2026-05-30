@@ -174,7 +174,7 @@ export default function ResultPage({ params }: ResultPageProps) {
               <Link href="/history" className="rounded-2xl border border-indigo-100 bg-white p-5 font-semibold text-indigo-700">
                 查看历史
               </Link>
-              <Link href="/outfit" className="rounded-2xl border border-purple-100 bg-white p-5 font-semibold text-purple-700">
+              <Link href="/outfit" className="rounded-2xl border border-purple-100 bg-white p-5 font-semibold text-indigo-700">
                 生成今日 OOTD
               </Link>
             </div>
