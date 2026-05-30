@@ -1,4 +1,5 @@
 import type { UserStyleProfile } from "./user-profile-types";
+import type { OutfitAiOutput } from "./outfit-ai-types";
 
 export type OutfitScene = "daily" | "travel";
 
@@ -25,20 +26,7 @@ export interface OutfitInspirationRequest {
   weather?: WeatherInfo | null;
 }
 
-export interface OutfitInspirationResult {
-  theme: string;
-  mainColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  top: string;
-  bottom: string;
-  outerwear: string;
-  shoes: string;
-  bag: string;
-  accessories: string;
-  makeup: string;
-  reason: string;
-}
+export type OutfitInspirationResult = OutfitAiOutput;
 
 export interface OutfitInspirationResponse {
   success: true;

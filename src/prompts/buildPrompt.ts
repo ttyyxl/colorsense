@@ -19,13 +19,11 @@ export interface ReservedUserProfilePromptContext {
   constraints?: string[];
 }
 
-// Phase 1 reserved only.
-// Do not include userProfile in active AI API calls until Phase 2 prompt integration is approved.
 export interface DiagnosisPromptDataWithReservedProfile extends DiagnosisData {
   userProfile?: ReservedUserProfilePromptContext;
 }
 
-export function buildUserPrompt(data: DiagnosisData): string {
+export function buildUserPrompt(data: DiagnosisPromptDataWithReservedProfile): string {
   return "请根据以下色彩诊断数据，为用户生成一份个性化的穿搭建议报告：\n\n" +
     "# 诊断数据\n" +
     "- 色彩季型：" + data.seasonType + "\n" +

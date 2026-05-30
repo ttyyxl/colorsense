@@ -66,10 +66,10 @@ export default function OutfitResultPage() {
                   <Palette className="h-5 w-5 text-indigo-600" aria-hidden="true" />
                   配色方案
                 </h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <ColorCard label="主色" value={result.mainColor} className="bg-indigo-100 text-indigo-800" />
-                  <ColorCard label="辅助色" value={result.secondaryColor} className="bg-slate-100 text-slate-800" />
-                  <ColorCard label="点缀色" value={result.accentColor} className="bg-purple-100 text-purple-800" />
+                <div className="mt-4 grid grid-cols-6 gap-3">
+                  {result.color_palette.map((color, index) => (
+                    <div key={index} className="h-12 w-12 rounded-full border border-slate-200" style={{ backgroundColor: color }} title={color}></div>
+                  ))}
                 </div>
               </section>
 
@@ -79,18 +79,18 @@ export default function OutfitResultPage() {
                   单品推荐
                 </h2>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Item label="上衣" value={result.top} />
-                  <Item label="下装" value={result.bottom} />
-                  <Item label="外套" value={result.outerwear} />
-                  <Item label="鞋子" value={result.shoes} />
-                  <Item label="包包" value={result.bag} />
-                  <Item label="配饰" value={result.accessories} />
+                  <Item label="上衣" value={result.item_recommendations.top} />
+                  <Item label="下装" value={result.item_recommendations.bottom} />
+                  <Item label="外套" value={result.item_recommendations.outerwear} />
+                  <Item label="鞋子" value={result.item_recommendations.shoes} />
+                  <Item label="包包" value={result.item_recommendations.bag} />
+                  <Item label="配饰" value={result.item_recommendations.accessories} />
                 </div>
               </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="text-lg font-bold text-slate-950">妆容建议</h2>
-                <p className="mt-3 leading-7 text-slate-600">{result.makeup}</p>
+                <p className="mt-3 leading-7 text-slate-600">{result.makeup_advice}</p>
               </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -122,14 +122,7 @@ export default function OutfitResultPage() {
   );
 }
 
-function ColorCard({ label, value, className }: { label: string; value: string; className: string }) {
-  return (
-    <div className={`rounded-2xl px-4 py-4 ${className}`}>
-      <p className="text-xs font-semibold opacity-70">{label}</p>
-      <p className="mt-2 text-lg font-bold">{value}</p>
-    </div>
-  );
-}
+
 
 function Item({ label, value }: { label: string; value: string }) {
   return (
