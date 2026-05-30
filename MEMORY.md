@@ -15,7 +15,7 @@
 - 后端服务：`inference_service` 使用 FastAPI，负责接收图片、做人脸检测/裁剪、加载 PyTorch 模型、执行四季分类推理并返回结果。
 - 当前正式模型推理流程：上传图片 -> Next.js `/api/diagnose` 校验用户和图片 -> FastAPI `/diagnose` -> 人脸检测和 face crop -> EfficientNet-B0 四分类模型 -> 后端返回 `source="model"` -> 前端二次校验 -> 生成 AI 建议 -> 写入 Firestore -> 跳转结果页。
 - Firebase 使用情况：Firebase Auth 管理登录；Cloud Firestore 保存 `diagnoses/{diagnosisId}`；Next.js 服务端通过 Firebase Admin SDK 写入诊断结果。
-- 当前验证情况：`npm run build` 已通过；后端 `main.py` / `face_detector.py` AST 语法检查通过；真实端到端部署验证仍需人工执行。
+- 当前验证情况：`npm run lint` 已通过；`npm run build` 已通过；后端 `main.py` / `face_detector.py` AST 语法检查通过；真实端到端部署验证仍需人工执行。
 
 ## 已完成的重要修改
 
@@ -34,6 +34,7 @@
 - 2026-05-28 新增历史诊断删除功能：`src/app/history/page.tsx` 改为通过服务端删除接口删除记录；`src/app/api/diagnoses/[id]/route.ts` 新增 DELETE，删除前读取 Firestore document 并确认归属当前用户。当前诊断记录不保存上传图片或子集合，因此删除范围仅为 `diagnoses/{diagnosisId}` document。
 - 2026-05-28 验证：新增历史删除功能后 `npm run lint` 通过，`npm run build` 通过。
 - 2026-05-28 新增历史记录批量操作：`src/app/history/page.tsx` 支持批量选择、批量删除、批量导出 PNG ZIP；新增 `src/app/api/diagnoses/batch-delete/route.ts`，服务端逐条校验 document 存在和 `userId` 归属后分批 batch delete；新增依赖 `jszip`。验证：`npm run lint` 通过，`npm run build` 通过。
+- 2026-05-28 已将当前版本推送到 GitHub `main` 分支，最新提交为 `22004d0 Add batch history operations`。推送前已检查 staged 文件名和新增行敏感信息模式，未提交 `.env.local`、service account JSON、真实 API key、构建产物、notebook 或训练输出。
 
 ## 当前模型情况
 

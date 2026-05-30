@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 
 const navItems = [
+  { href: "/", label: "返回首页" },
   { href: "/upload", label: "开始诊断" },
   { href: "/outfit", label: "穿搭灵感" },
   { href: "/history", label: "历史记录" },
@@ -49,8 +50,8 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-[#81bfe9]/14 bg-white/48 backdrop-blur-[20px]">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <header className="relative z-[100] overflow-visible border-b border-[#81bfe9]/14 bg-white/48 backdrop-blur-[20px]">
+      <nav className="relative mx-auto flex h-16 max-w-7xl items-center justify-between overflow-visible px-4 sm:px-6">
         <Link href="/" className="text-xl font-bold text-[#181698]">
           ColorSense
         </Link>
@@ -80,7 +81,7 @@ export function Navbar() {
               </button>
 
               {menuOpen && (
-                <div role="menu" className="absolute right-0 z-50 mt-3 w-64 overflow-hidden rounded-2xl border border-[#81bfe9]/24 bg-white shadow-xl">
+                <div role="menu" className="absolute right-0 z-[120] mt-3 w-64 overflow-hidden rounded-2xl border border-[#81bfe9]/24 bg-white shadow-xl">
                   <div className="border-b border-slate-100 px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500">当前账户</p>
                     <p className="mt-1 truncate text-sm font-semibold text-slate-900">{accountLabel}</p>

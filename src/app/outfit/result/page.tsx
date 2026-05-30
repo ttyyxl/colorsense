@@ -107,11 +107,11 @@ export default function OutfitResultPage() {
                   重新生成
                 </Link>
                 <Link
-                  href="/upload"
+                  href="/"
                   className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 font-semibold text-white hover:bg-indigo-700"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  返回诊断
+                  返回首页
                 </Link>
               </div>
             </div>

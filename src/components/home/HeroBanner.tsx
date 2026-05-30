@@ -190,7 +190,7 @@ export function HeroBanner({ primaryActions }: { primaryActions: HomeRouteAction
             <motion.div layout className="mt-6 rounded-[20px] bg-white/46 p-5 ring-1 ring-[#81bfe9]/20">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-[#667694]">动态 Profile 沙盒</p>
+                  <p className="text-sm font-semibold text-[#667694]">特点</p>
                   <AnimatePresence mode="wait">
                     <motion.p
                       key={activeProfile.id + "-trait"}

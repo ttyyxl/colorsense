@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckSquare, Download, Loader2, Trash2, X } from "lucide-react";
 import html2canvas from "html2canvas-pro";
 import JSZip from "jszip";
@@ -165,6 +166,7 @@ function ExportDiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
   const { currentUser } = useAuth();
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -183,6 +185,10 @@ export default function HistoryPage() {
   const allSelected = diagnoses.length > 0 && selectedIds.size === diagnoses.length;
   const hasSelection = selectedIds.size > 0;
   const isBusy = bulkAction !== null || deletingId !== null;
+
+  function openDiagnosis(id: string) {
+    router.push(`/result/${id}`);
+  }
 
   useEffect(() => {
     async function loadHistory() {
@@ -474,7 +480,29 @@ export default function HistoryPage() {
               const isSelected = selectedIds.has(diagnosis.id);
 
               return (
-                <article key={diagnosis.id} className={`rounded-2xl border bg-white p-5 shadow-sm ${isSelected ? "border-indigo-400" : "border-slate-200"}`}>
+                <article
+                  key={diagnosis.id}
+                  role={batchMode ? undefined : "link"}
+                  tabIndex={batchMode ? -1 : 0}
+                  aria-label={batchMode ? undefined : `查看 ${season.name} 诊断详情`}
+                  onClick={() => {
+                    if (!batchMode) {
+                      openDiagnosis(diagnosis.id);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (batchMode) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openDiagnosis(diagnosis.id);
+                    }
+                  }}
+                  className={`rounded-2xl border bg-white p-5 shadow-sm outline-none transition ${
+                    isSelected ? "border-indigo-400" : "border-slate-200"
+                  } ${batchMode ? "" : "cursor-pointer hover:border-indigo-300 hover:shadow-md focus:ring-2 focus:ring-indigo-200"}`}
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                       {batchMode && (
@@ -505,7 +533,7 @@ export default function HistoryPage() {
                     ))}
                   </div>
 
-                  <div className="mt-5 flex flex-wrap gap-3">
+                  <div className="mt-5 flex flex-wrap gap-3" onClick={(event) => event.stopPropagation()}>
                     <Link
                       href={`/result/${diagnosis.id}`}
                       aria-disabled={batchMode}
