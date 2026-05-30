@@ -3,10 +3,10 @@ import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
 import { verifyAuth } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
-//import { buildUserPrompt } from "@/prompts/buildPrompt";
 import { generateDoubaoStyleAdvice } from "@/lib/ai";
-import { buildDoubaoUserPrompt } from "@/prompts/doubaoBuildPrompt";
 import type { DiagnosisQuality } from "@/lib/types";
+import { getUserProfile } from "@/lib/firestore-user-profiles";
+import { buildUserProfilePromptContext } from "@/lib/user-profile-summary";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,6 @@ class InferenceTimeoutError extends Error {
 
 class NoClearFaceError extends Error {
   quality: DiagnosisQuality;
-
   constructor(message: string, quality: DiagnosisQuality) {
     super(message);
     this.name = "NoClearFaceError";
@@ -45,86 +44,43 @@ interface InferenceResponse {
   confidence: number;
   source?: "model" | "rules";
   scores?: Partial<Record<SeasonType, number>>;
-  lab_features?: {
-    L: number;
-    a: number;
-    b: number;
-  };
+  lab_features?: { L: number; a: number; b: number };
   faceDetected?: boolean;
   usedOriginalImage?: boolean;
   face_confidence?: number;
   quality?: Partial<DiagnosisQuality>;
 }
 
-interface InferenceErrorResponse {
-  success?: false;
-  error?: string;
-  code?: string;
-  message?: string;
-  quality?: DiagnosisQuality;
-  detail?: string;
-}
-
 async function runInference(file: File): Promise<InferenceResponse> {
   const inferenceUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.INFERENCE_SERVICE_URL;
-
   if (!inferenceUrl) {
     throw new Error("Inference service is not configured.");
   }
 
-  let response: Response;
-  const startedAt = Date.now();
-  console.info("[diagnose-debug] FastAPI request start", {
-    inferenceServiceUrlPresent: true,
-    timeoutMs: INFERENCE_TIMEOUT_MS,
-  });
+  const formData = new FormData();
+  formData.append("image", file);
 
-  try {
-    const formData = new FormData();
-    formData.append("image", file);
-
-    response = await fetch(`${inferenceUrl.replace(/\/$/, "")}/diagnose`, {
-      method: "POST",
-      body: formData,
-      signal: AbortSignal.timeout(INFERENCE_TIMEOUT_MS),
-    });
-  } catch (error) {
-    const durationMs = Date.now() - startedAt;
-    console.error("[diagnose-debug] FastAPI request failed", {
-      durationMs,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new InferenceTimeoutError();
-    }
-    throw new Error("Inference service is unavailable. Please try again.");
-  }
-
-  console.info("[diagnose-debug] FastAPI response", {
-    status: response.status,
-    durationMs: Date.now() - startedAt,
+  const response = await fetch(`${inferenceUrl.replace(/\/$/, "")}/diagnose`, {
+    method: "POST",
+    body: formData,
+    signal: AbortSignal.timeout(INFERENCE_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as InferenceErrorResponse;
+    const payload = await response.json().catch(() => ({}));
     if (response.status === 422 && payload.error === "NO_CLEAR_FACE") {
       throw new NoClearFaceError(
         payload.message ?? NO_CLEAR_FACE_MESSAGE,
-        payload.quality ?? { faceDetected: false, usedOriginalImage: true, faceConfidence: 0 },
+        payload.quality ?? { faceDetected: false, usedOriginalImage: true, faceConfidence: 0 }
       );
     }
-    if (response.status === 503 && (payload.code === "MODEL_UNAVAILABLE" || payload.error === "MODEL_UNAVAILABLE")) {
+    if (response.status === 503 && payload.code === "MODEL_UNAVAILABLE") {
       throw new ModelUnavailableError(payload.message);
     }
     throw new Error(payload.detail ?? payload.message ?? "诊断失败，请重新选择清晰的正面照。");
   }
 
-  const payload = (await response.json()) as InferenceResponse;
-  console.info("[diagnose-debug] FastAPI payload", {
-    keys: Object.keys(payload),
-    source: payload.source,
-  });
-  return payload;
+  return await response.json();
 }
 
 function isSeasonType(value: string): value is SeasonType {
@@ -132,6 +88,7 @@ function isSeasonType(value: string): value is SeasonType {
 }
 
 export async function POST(request: Request) {
+  // 1. 验证用户
   const user = await verifyAuth();
   if (!user) {
     return NextResponse.json({ success: false, error: "请先登录后再开始诊断。" }, { status: 401 });
@@ -139,9 +96,10 @@ export async function POST(request: Request) {
 
   const canUseDiagnosisFeatures = user.email_verified === true || user.firebase?.sign_in_provider === "google.com";
   if (!canUseDiagnosisFeatures) {
-    return NextResponse.json({ success: false, error: "Please verify your email before starting a diagnosis." }, { status: 403 });
+    return NextResponse.json({ success: false, error: "请先验证邮箱后再进行诊断。" }, { status: 403 });
   }
 
+  // 2. 验证图片
   const formData = await request.formData();
   const image = formData.get("image");
 
@@ -158,21 +116,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    // 3. 调用推理服务
     const inference = await runInference(image);
 
     if (inference.source !== "model") {
       throw new ModelUnavailableError();
     }
 
+    // 4. 验证人脸检测结果
     const faceDetected = inference.quality?.faceDetected ?? inference.faceDetected;
     const usedOriginalImage = inference.quality?.usedOriginalImage ?? inference.usedOriginalImage;
     const faceConfidence = inference.quality?.faceConfidence ?? inference.face_confidence;
-    if (
-      faceDetected !== true ||
-      usedOriginalImage !== false ||
-      typeof faceConfidence !== "number" ||
-      faceConfidence < MIN_FACE_CONFIDENCE
-    ) {
+    
+    if (faceDetected !== true || usedOriginalImage !== false || 
+        typeof faceConfidence !== "number" || faceConfidence < MIN_FACE_CONFIDENCE) {
       throw new NoClearFaceError(NO_CLEAR_FACE_MESSAGE, {
         faceDetected: faceDetected ?? false,
         usedOriginalImage: usedOriginalImage ?? true,
@@ -180,92 +137,91 @@ export async function POST(request: Request) {
       });
     }
 
+    // 5. 验证季节类型
     if (!isSeasonType(inference.season)) {
       throw new Error("Inference service returned an unsupported season.");
     }
 
+    // 6. 准备基础数据
     const season = SEASONS[inference.season];
+    const labFeatures = inference.lab_features ?? { L: 65, a: 8, b: 12 };
+    
+    // 7. 获取用户画像
+    const userProfile = await getUserProfile(user.uid);
+    const userProfileContext = userProfile ? buildUserProfilePromptContext(userProfile) : undefined;
+
+    // 8. 【关键】先生成 AI 建议（使用季节的基础数据，而不是 diagnosis）
+    console.info("[diagnose-debug] 开始生成豆包风格建议...");
+    const doubaoAdvice = await generateDoubaoStyleAdvice({
+      season: inference.season,
+      confidence: inference.confidence,
+      lab_features: labFeatures,
+      userProfile: userProfileContext,
+      recommended_colors: season.palette.slice(0, 3),  // 使用季节色板
+      avoid_colors: season.avoid.slice(0, 2),          // 使用避免颜色
+      keywords: season.keywords,                       // 使用季节关键词
+    }).catch((error) => {
+      console.error("[diagnose-debug] 生成豆包建议失败:", error);
+      return null;
+    });
+
+    // 9. 【然后】创建诊断对象（此时 doubaoAdvice 已经存在）
     const diagnosis = {
       seasonType: inference.season,
       confidence: inference.confidence,
-      colorPalette: season.palette,
+      colorPalette: doubaoAdvice?.personalized_color_palette || season.palette, // 优先使用个性化色板
       styleKeywords: season.keywords,
       avoidColors: season.avoid,
       aiDescription: season.styleDesc,
-      labFeatures: inference.lab_features ?? { L: 65, a: 8, b: 12 },
+      labFeatures: labFeatures,
       source: inference.source,
       scores: inference.scores,
       faceDetected,
       usedOriginalImage,
       faceConfidence,
     };
+    
     const { scores, ...requiredDiagnosisFields } = diagnosis;
 
-    if (requiredDiagnosisFields.source !== "model") {
-      throw new ModelUnavailableError();
+    // 10. 保存到数据库
+    let diagnosisId: string;
+    try {
+      const docRef = await getAdminDb().collection("diagnoses").add({
+        ...requiredDiagnosisFields,
+        ...(scores === undefined ? {} : { scores }),
+        doubaoAdvice,
+        userId: user.uid,
+        createdAt: new Date(),
+      });
+      diagnosisId = docRef.id;
+      console.info("[diagnose-debug] 保存成功", { diagnosisId });
+    } catch (error) {
+      console.error("[diagnose-debug] 保存失败:", error);
+      return NextResponse.json({ success: false, error: "诊断完成，但保存结果失败，请稍后重试。" }, { status: 500 });
     }
 
-    // 替换第209-217行
-console.info("[diagnose-debug] Generating Doubao style advice...");
-const doubaoAdvice = await generateDoubaoStyleAdvice({
-  season: inference.season,
-  confidence: inference.confidence,
-  lab_features: diagnosis.labFeatures,
-  recommended_colors: diagnosis.colorPalette.slice(0, 3),
-  avoid_colors: diagnosis.avoidColors.slice(0, 2),
-  keywords: diagnosis.styleKeywords,
-}).catch((error) => {
-  console.error("[diagnose-debug] Failed to generate Doubao advice:", error);
-  return null; // 确保返回 null 而不是 undefined
-});
-
-let diagnosisId: string;
-try {
-  const docRef = await getAdminDb().collection("diagnoses").add({
-    ...requiredDiagnosisFields,
-    ...(scores === undefined ? {} : { scores }),
-    doubaoAdvice, // 现在 doubaoAdvice 要么是有效值，要么是 null
-    userId: user.uid,
-    createdAt: new Date(),
-  });
-  diagnosisId = docRef.id;
-  console.info("[diagnose-debug] Firestore write", {
-    succeeded: true,
-    diagnosisIdPresent: Boolean(diagnosisId),
-  });
-} catch (error) {
-  console.error("[diagnose-debug] Firestore write failed", {
-    succeeded: false,
-    diagnosisIdPresent: false,
-    message: error instanceof Error ? error.message : String(error),
-  });
-  return NextResponse.json({ success: false, error: "诊断完成，但保存结果失败，请稍后重试。" }, { status: 500 });
-}
-
-    const finalPayload = {
+    // 11. 返回结果
+    return NextResponse.json({
       success: true,
       diagnosisId,
       data: {
         ...diagnosis,
         doubaoAdvice,
       },
-    };
-    console.info("[diagnose-debug] Final response", {
-      keys: Object.keys(finalPayload),
-      diagnosisIdPresent: Boolean(diagnosisId),
     });
-    return NextResponse.json(finalPayload);
+    
   } catch (error) {
+    // 错误处理
     if (error instanceof NoClearFaceError) {
       return NextResponse.json(
         { success: false, error: "NO_CLEAR_FACE", message: error.message, quality: error.quality },
-        { status: 422 },
+        { status: 422 }
       );
     }
     if (error instanceof ModelUnavailableError) {
       return NextResponse.json(
-        { success: false, error: "MODEL_UNAVAILABLE", code: "MODEL_UNAVAILABLE", message: error.message },
-        { status: 503 },
+        { success: false, error: "MODEL_UNAVAILABLE", message: error.message },
+        { status: 503 }
       );
     }
     if (error instanceof InferenceTimeoutError) {
@@ -273,7 +229,7 @@ try {
     }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "诊断失败，请稍后重试。" },
-      { status: 422 },
+      { status: 422 }
     );
   }
 }
