@@ -15,6 +15,12 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    match /users/{userId} {
+      allow read, create, update: if canUseDiagnosisFeatures()
+        && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
     match /users/{userId}/profile/{profileId} {
       allow read, write: if canUseDiagnosisFeatures()
         && request.auth.uid == userId;

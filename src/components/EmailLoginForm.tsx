@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ export function EmailLoginForm({ nextPath }: EmailLoginFormProps) {
   }
 
   return (
-    <form onSubmit={login} className="space-y-4 rounded-2xl border border-indigo-100 p-5">
+    <form onSubmit={login} className="space-y-4 rounded-2xl border border-indigo-100 bg-white/72 p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-950">邮箱登录</h2>
       {notice && (
         <p
@@ -60,7 +60,7 @@ export function EmailLoginForm({ nextPath }: EmailLoginFormProps) {
           id="email-login"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500"
+          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500"
           placeholder="name@example.com"
           type="email"
           autoComplete="email"
@@ -72,13 +72,13 @@ export function EmailLoginForm({ nextPath }: EmailLoginFormProps) {
           id="password-login"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500"
+          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500"
           placeholder="密码（至少 6 位）"
           type="password"
           autoComplete="current-password"
         />
       </div>
-      <button type="submit" disabled={pending} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white disabled:opacity-60">
+      <button type="submit" disabled={pending} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60">
         {pending ? "登录中..." : "邮箱登录"}
       </button>
     </form>

@@ -1,11 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  GoogleAuthProvider,
-  signInWithPopup,
-} from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { Notice, resolveNextPath } from "./auth-utils";
 
@@ -48,7 +45,7 @@ export function GoogleAuthSection({ nextPath }: GoogleAuthSectionProps) {
           {notice.text}
         </p>
       )}
-      <button type="button" onClick={loginWithGoogle} disabled={pending} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 disabled:opacity-60">
+      <button type="button" onClick={loginWithGoogle} disabled={pending} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm disabled:opacity-60">
         {pending ? "Google 登录中..." : "使用 Google 登录"}
       </button>
     </div>

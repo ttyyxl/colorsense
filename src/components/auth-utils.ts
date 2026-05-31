@@ -1,5 +1,4 @@
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
-import { FormEvent } from "react";
+﻿import { auth, isFirebaseConfigured } from "@/lib/firebase";
 
 export type Notice = { type: "success" | "error"; text: string } | null;
 

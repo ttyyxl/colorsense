@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, FileUser, History, LogOut, Settings, Sparkles, UserCircle } from "lucide-react";
+import { ChevronDown, FileUser, LogOut, Settings, UserCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
@@ -17,9 +17,8 @@ const navItems = [
 export function Navbar() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { currentUser, isAuthenticated, logout: firebaseLogout } = useAuth();
+  const { accountLabel, currentUser, isAuthenticated, logout: firebaseLogout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const accountLabel = currentUser?.displayName?.trim() || currentUser?.email || "已登录用户";
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -88,7 +87,7 @@ export function Navbar() {
                   </div>
                   <div className="p-2">
                     <AccountMenuLink href="/profile/portrait" label="查看个人肖像档案" icon={<FileUser className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
-
+                    <AccountMenuLink href="/settings" label="设置" icon={<Settings className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
                   </div>
                   <div className="border-t border-slate-100 p-2">
                     <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50">
@@ -101,7 +100,7 @@ export function Navbar() {
             </div>
           ) : (
             <Link href="/login" className="rounded-xl border border-[#81bfe9]/28 bg-white/38 px-4 py-2 text-sm font-semibold text-[#181698] shadow-sm hover:bg-white/66">
-              登录
+              登录/注册
             </Link>
           )}
         </div>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "ColorSense | AI 四季色彩诊断",
-  description: "面向中文用户的 AI 四季色彩诊断与个人风格推荐平台",
+  description: "面向中文用户的 AI 四季色彩诊断与个人风格推荐平台。",
 };
 
 export default function RootLayout({

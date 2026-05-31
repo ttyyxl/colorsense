@@ -1,14 +1,16 @@
-'use client';
+﻿"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
 import { FooterGradient } from "@/components/home/FooterGradient";
 import { EmailLoginForm } from "@/components/EmailLoginForm";
 import { EmailRegisterForm } from "@/components/EmailRegisterForm";
 import { GoogleAuthSection } from "@/components/GoogleAuthSection";
-import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { resolveNextPath, Notice } from "@/components/auth-utils";
-import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/useAuth";
 
 interface LoginPageProps {
   searchParams?: { next?: string };
@@ -16,12 +18,18 @@ interface LoginPageProps {
 
 type AuthMode = "login" | "register";
 
+function canUseProtectedPages(providerIds: string[], emailVerified: boolean) {
+  return emailVerified || providerIds.includes("google.com");
+}
+
 export default function LoginPage({ searchParams }: LoginPageProps) {
   const router = useRouter();
+  const { currentUser, loading, refreshCurrentUser } = useAuth();
   const requestedNext = searchParams?.next;
   const nextPath = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/upload";
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [notice, setNotice] = useState<Notice>(null);
+  const [checkingVerification, setCheckingVerification] = useState(false);
 
   useEffect(() => {
     const isVerificationReturn = new URLSearchParams(window.location.search).get("verified") === "1";
@@ -69,30 +77,112 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     };
   }, [router]);
 
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
-      <Navbar />
-      <section className="mx-auto flex max-w-xl flex-col px-6 py-12 sm:py-16">
-        <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-lg shadow-indigo-100 sm:p-8">
-          <h1 className="text-3xl font-bold text-slate-950">欢迎来到 ColorSense</h1>
-          <p className="mt-3 leading-7 text-slate-600">
-            请选择登录或注册。
-          </p>
+  const checkVerificationStatus = useCallback(
+    async (showPendingNotice = true) => {
+      if (!currentUser) {
+        setNotice({ type: "success", text: "邮箱验证成功后，请使用邮箱和密码登录。" });
+        setAuthMode("login");
+        return;
+      }
 
-          <div className="mt-6 flex space-x-4">
+      setCheckingVerification(true);
+      try {
+        const refreshedUser = await refreshCurrentUser();
+        const providerIds = refreshedUser?.providerData.map((provider) => provider.providerId) ?? [];
+        if (refreshedUser && canUseProtectedPages(providerIds, refreshedUser.emailVerified)) {
+          router.replace(await resolveNextPath(nextPath));
+          router.refresh();
+          return;
+        }
+
+        if (showPendingNotice) {
+          setNotice({ type: "error", text: "邮箱验证状态尚未更新，请确认已经点击邮件中的验证链接后重试。" });
+        }
+      } catch {
+        if (showPendingNotice) {
+          setNotice({ type: "error", text: "邮箱验证状态检查失败，请刷新页面或重新登录。" });
+        }
+      } finally {
+        setCheckingVerification(false);
+      }
+    },
+    [currentUser, nextPath, refreshCurrentUser, router],
+  );
+
+  useEffect(() => {
+    if (loading || !currentUser) {
+      return;
+    }
+
+    const providerIds = currentUser.providerData.map((provider) => provider.providerId);
+    if (!canUseProtectedPages(providerIds, currentUser.emailVerified)) {
+      return;
+    }
+
+    let active = true;
+    async function redirectVerifiedUser() {
+      const destination = await resolveNextPath(nextPath);
+      if (!active) {
+        return;
+      }
+      router.replace(destination);
+      router.refresh();
+    }
+
+    void redirectVerifiedUser();
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser, loading, nextPath, router]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.emailVerified) {
+      return;
+    }
+
+    function handleFocus() {
+      void checkVerificationStatus(false);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void checkVerificationStatus(false);
+      }
+    }
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkVerificationStatus, currentUser]);
+
+  return (
+    <main className="flex min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(129,191,233,0.28),transparent_34%),linear-gradient(135deg,#f8fbff_0%,#eef6ff_45%,#f6f2ff_100%)]">
+      <Navbar />
+      <section className="relative mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-12 sm:py-16">
+        <div className="pointer-events-none absolute -right-20 top-8 h-56 w-56 rounded-full bg-[#81bfe9]/20 blur-3xl" aria-hidden="true" />
+        <div className="relative rounded-2xl border border-indigo-100 bg-white/76 p-6 shadow-lg shadow-indigo-100/70 backdrop-blur sm:p-8">
+          <p className="text-sm font-semibold text-indigo-700">ColorSense 账户</p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-950">欢迎来到 ColorSense</h1>
+          <p className="mt-3 leading-7 text-slate-600">请选择登录或注册。完成邮箱验证后，即可保存个人形象信息并开始色彩诊断。</p>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 rounded-2xl bg-slate-100 p-1">
             <button
-              className={`px-4 py-2 rounded-xl font-semibold ${
-                authMode === "login"
-                  ? "bg-indigo-600 text-white" : "bg-white text-indigo-700 border border-indigo-200"
+              type="button"
+              className={`rounded-xl px-4 py-2 font-semibold transition ${
+                authMode === "login" ? "bg-indigo-600 text-white shadow-sm" : "text-indigo-700 hover:bg-white/70"
               }`}
               onClick={() => setAuthMode("login")}
             >
               登录
             </button>
             <button
-              className={`px-4 py-2 rounded-xl font-semibold ${
-                authMode === "register"
-                  ? "bg-indigo-600 text-white" : "bg-white text-indigo-700 border border-indigo-200"
+              type="button"
+              className={`rounded-xl px-4 py-2 font-semibold transition ${
+                authMode === "register" ? "bg-indigo-600 text-white shadow-sm" : "text-indigo-700 hover:bg-white/70"
               }`}
               onClick={() => setAuthMode("register")}
             >
@@ -111,13 +201,21 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           )}
 
-          <div className="mt-6">
-            {authMode === "login" ? (
-              <EmailLoginForm nextPath={nextPath} />
-            ) : (
-              <EmailRegisterForm nextPath={nextPath} />
-            )}
-          </div>
+          {currentUser && !currentUser.emailVerified && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+              <p>当前账号已登录，但邮箱尚未完成验证。请在邮箱中点击验证链接，回到本页后系统会自动检查。</p>
+              <button
+                type="button"
+                onClick={() => void checkVerificationStatus(true)}
+                disabled={checkingVerification}
+                className="mt-3 rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
+              >
+                {checkingVerification ? "正在检查..." : "我已完成验证"}
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6">{authMode === "login" ? <EmailLoginForm nextPath={nextPath} /> : <EmailRegisterForm nextPath={nextPath} />}</div>
 
           <GoogleAuthSection nextPath={nextPath} />
         </div>

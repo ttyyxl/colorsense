@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
+import { FooterGradient } from "@/components/home/FooterGradient";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { auth } from "@/lib/firebase";
@@ -85,9 +86,10 @@ function PortraitProfileContent() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
+    <main className="flex min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(129,191,233,0.28),transparent_34%),linear-gradient(135deg,#f8fbff_0%,#eef6ff_45%,#f6f2ff_100%)]">
       <Navbar />
-      <section className="mx-auto max-w-4xl px-6 py-10">
+      <section className="relative mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+        <div className="pointer-events-none absolute -right-24 top-10 h-64 w-64 rounded-full bg-[#81bfe9]/20 blur-3xl" aria-hidden="true" />
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold text-indigo-700">个人肖像档案</p>
@@ -105,7 +107,6 @@ function PortraitProfileContent() {
 
         <div className="mt-8 space-y-8">
           <AccountCard
-            displayName={currentUser?.displayName ?? ""}
             email={currentUser?.email ?? ""}
             updatedAt={formatUnknownDate(profile?.updatedAt)}
           />
@@ -133,16 +134,16 @@ function PortraitProfileContent() {
           )}
         </div>
       </section>
+      <FooterGradient />
     </main>
   );
 }
 
-function AccountCard({ displayName, email, updatedAt }: { displayName: string; email: string; updatedAt: string }) {
+function AccountCard({ email, updatedAt }: { email: string; updatedAt: string }) {
   return (
     <section className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-bold text-slate-950">当前账户信息</h2>
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <InfoItem label="昵称" value={displayName || "未设置"} />
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
         <InfoItem label="邮箱" value={email || "未绑定"} />
         <InfoItem label="最近更新时间" value={updatedAt} />
       </div>

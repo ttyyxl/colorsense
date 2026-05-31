@@ -720,9 +720,9 @@ export default function HistoryPage() {
 
   return (
     <ProtectedRoute>
-      <main className="home-dashboard-shell min-h-screen">
+      <main className="home-dashboard-shell flex min-h-screen flex-col">
         <Navbar />
-        <section className="mx-auto max-w-5xl px-6 py-12">
+        <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="mt-2 text-4xl font-extrabold leading-tight text-[#181698]">历史记录</h1>
