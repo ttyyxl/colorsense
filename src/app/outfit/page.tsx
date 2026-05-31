@@ -459,10 +459,10 @@ function SceneCard({ label, selected, onClick }: { label: string; selected: bool
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-16 glass-card rounded-[12px] px-4 py-3 text-center text-sm font-semibold transition hover:-translate-y-0.5 ${
+      className={`min-h-20 rounded-[12px] px-3 py-3 text-center transition hover:-translate-y-0.5 ${
         selected
-          ? "border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-          : "text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"
+          ? "bg-blue-600 border-blue-600 shadow-md text-white"
+          : "glass-card border border-slate-100"
       }`}
     >
       {label}
@@ -483,14 +483,14 @@ function MoodCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const base =
+    "min-h-20 rounded-[12px] px-3 py-3 text-center transition hover:-translate-y-0.5 border";
+
+  const idle = `${tone} border-slate-100 text-slate-700`;
+  const active = "!bg-blue-600 !border-blue-600 text-white shadow-md";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-20 glass-card rounded-[12px] px-3 py-3 text-center transition hover:-translate-y-0.5 ${
-        selected ? "border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-100" : tone
-      }`}
-    >
+    <button type="button" onClick={onClick} className={`${base} ${selected ? active : idle}`}>
       <span className="block text-2xl leading-none">{emoji}</span>
       <span className="mt-2 block text-sm font-bold">{label}</span>
     </button>
