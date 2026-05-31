@@ -88,12 +88,7 @@ export function Navbar() {
                   </div>
                   <div className="p-2">
                     <AccountMenuLink href="/profile/portrait" label="查看个人肖像档案" icon={<FileUser className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
-                    <AccountMenuLink href="/outfit" label="今日 OOTD" icon={<Sparkles className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
-                    <AccountMenuLink href="/history" label="历史诊断记录" icon={<History className="h-4 w-4" />} onClick={() => setMenuOpen(false)} />
-                    <button type="button" disabled className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-400">
-                      <Settings className="h-4 w-4" aria-hidden="true" />
-                      设置
-                    </button>
+
                   </div>
                   <div className="border-t border-slate-100 p-2">
                     <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50">

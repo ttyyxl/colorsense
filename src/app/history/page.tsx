@@ -240,7 +240,7 @@ function BatchToolbar({
   exportLabel: string;
 }) {
   return (
-    <div className="mt-6 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+    <div className="mt-6 glass-card rounded-[20px] p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
           <input type="checkbox" checked={allSelected} disabled={isBusy} onChange={onToggleAll} className="h-4 w-4 rounded border-slate-300" />
@@ -254,7 +254,7 @@ function BatchToolbar({
           type="button"
           onClick={onDelete}
           disabled={selectedCount === 0 || isBusy}
-          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 glass-card rounded-[12px] border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           {deleteLabel}
@@ -263,7 +263,7 @@ function BatchToolbar({
           type="button"
           onClick={onExport}
           disabled={selectedCount === 0 || isBusy}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="inline-flex items-center gap-2 rounded-[12px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Download className="h-4 w-4" aria-hidden="true" />
           {exportLabel}
@@ -272,7 +272,7 @@ function BatchToolbar({
           type="button"
           onClick={onCancel}
           disabled={isBusy}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 glass-card rounded-[12px] border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <X className="h-4 w-4" aria-hidden="true" />
           取消
@@ -297,8 +297,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-        active ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+      className={`inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-sm font-semibold transition ${
+        active ? "bg-indigo-600 text-white shadow-sm" : "glass-card text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
       }`}
     >
       {icon}
@@ -719,33 +719,55 @@ export default function HistoryPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-gradient-to-br from-white to-indigo-50">
+      <main className="home-dashboard-shell min-h-screen">
         <Navbar />
         <section className="mx-auto max-w-5xl px-6 py-12">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-indigo-700">P06 历史记录</p>
-              <h1 className="mt-2 text-4xl font-bold text-slate-950">你的诊断与穿搭日记</h1>
+              <h1 className="mt-2 text-4xl font-bold text-slate-950">历史记录</h1>
             </div>
           </div>
 
-          <div className="mt-6 inline-flex rounded-2xl border border-slate-200 bg-white p-1">
-            <TabButton active={activeTab === "diagnoses"} icon={<History className="h-4 w-4" aria-hidden="true" />} label="诊断记录" onClick={() => setActiveTab("diagnoses")} />
-            <TabButton active={activeTab === "outfits"} icon={<Shirt className="h-4 w-4" aria-hidden="true" />} label="穿搭日记" onClick={() => setActiveTab("outfits")} />
-          </div>
+          {/* 标签页和批量操作按钮在同一行 */}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            {/* 左侧标签组 */}
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1">
+              <TabButton active={activeTab === "diagnoses"} icon={<History className="h-4 w-4" aria-hidden="true" />} label="诊断记录" onClick={() => setActiveTab("diagnoses")} />
+              <TabButton active={activeTab === "outfits"} icon={<Shirt className="h-4 w-4" aria-hidden="true" />} label="穿搭日记" onClick={() => setActiveTab("outfits")} />
+            </div>
 
-          <div className="mt-3 inline-flex rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
-            点击卡片查看结果页
+            {/* 右侧批量操作按钮（仅在非批量模式且有数据时显示） */}
+            {activeTab === "diagnoses" && !diagnosisBatchMode && diagnoses.length > 0 && (
+              <button
+                type="button"
+                onClick={enterDiagnosisBatchMode}
+                className="inline-flex items-center gap-2 glass-card rounded-[12px] px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
+              >
+                <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                批量操作
+              </button>
+            )}
+
+            {activeTab === "outfits" && !outfitBatchMode && outfitRecords.length > 0 && (
+              <button
+                type="button"
+                onClick={enterOutfitBatchMode}
+                className="inline-flex items-center gap-2 glass-card rounded-[12px] px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
+              >
+                <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                批量操作
+              </button>
+            )}
           </div>
 
           {activeTab === "diagnoses" ? (
             <div className="mt-6">
-              {diagnosisError && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{diagnosisError}</p>}
-              {diagnosisNotice && <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{diagnosisNotice}</p>}
-              {diagnosisLoading && <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6 text-slate-600">正在读取历史诊断记录...</div>}
+              {diagnosisError && <p className="glass-card rounded-[12px] border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{diagnosisError}</p>}
+              {diagnosisNotice && <p className="mt-3 glass-card rounded-[12px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{diagnosisNotice}</p>}
+              {diagnosisLoading && <div className="mt-8 glass-card rounded-[20px] p-6 text-slate-600">正在读取历史诊断记录...</div>}
 
               {!diagnosisLoading && diagnoses.length === 0 && (
-                <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6">
+                <div className="mt-8 glass-card rounded-[20px] p-6">
                   <h2 className="text-2xl font-bold text-slate-950">还没有诊断记录</h2>
                   <p className="mt-3 text-slate-600">上传一张正面照片后，这里会显示你的历史诊断。</p>
                 </div>
@@ -764,19 +786,6 @@ export default function HistoryPage() {
                   deleteLabel={diagnosisBulkAction === "delete" ? "删除中..." : "批量删除"}
                   exportLabel={diagnosisBulkAction === "export" ? "导出中..." : "批量导出"}
                 />
-              )}
-
-              {!diagnosisBatchMode && diagnoses.length > 0 && (
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={enterDiagnosisBatchMode}
-                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
-                  >
-                    <CheckSquare className="h-4 w-4" aria-hidden="true" />
-                    批量操作
-                  </button>
-                </div>
               )}
 
               <div className="mt-6 grid gap-4">
@@ -801,7 +810,7 @@ export default function HistoryPage() {
                           openDiagnosis(diagnosis.id);
                         }
                       }}
-                      className={`rounded-2xl border bg-white p-5 shadow-sm outline-none transition ${
+                      className={`glass-card rounded-[20px] p-5 shadow-sm outline-none transition ${
                         isSelected ? "border-indigo-400" : "border-slate-200"
                       } ${diagnosisBatchMode ? "" : "cursor-pointer hover:border-indigo-300 hover:shadow-md focus:ring-2 focus:ring-indigo-200"}`}
                     >
@@ -829,7 +838,7 @@ export default function HistoryPage() {
 
                       <div className="mt-4 flex gap-2">
                         {diagnosis.colorPalette.map((color) => (
-                          <span key={color} className="h-8 w-8 rounded-full border border-slate-200" style={{ backgroundColor: color }} />
+                          <span key={color} className="h-8 w-8 rounded-full glass-card" style={{ backgroundColor: color }} />
                         ))}
                       </div>
 
@@ -842,7 +851,7 @@ export default function HistoryPage() {
                               void removeDiagnosis(diagnosis.id);
                             }}
                             disabled={isDeleting}
-                            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center gap-2 glass-card rounded-[12px] border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
                             {isDeleting ? "删除中..." : "删除记录"}
@@ -862,12 +871,12 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="mt-6">
-              {outfitError && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{outfitError}</p>}
-              {outfitNotice && <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{outfitNotice}</p>}
-              {outfitLoading && <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6 text-slate-600">正在读取穿搭日记...</div>}
+              {outfitError && <p className="glass-card rounded-[12px] border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{outfitError}</p>}
+              {outfitNotice && <p className="mt-3 glass-card rounded-[12px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{outfitNotice}</p>}
+              {outfitLoading && <div className="mt-8 glass-card rounded-[20px] p-6 text-slate-600">正在读取穿搭日记...</div>}
 
               {!outfitLoading && outfitRecords.length === 0 && (
-                <div className="mt-8 rounded-2xl border border-indigo-100 bg-white p-6">
+                <div className="mt-8 glass-card rounded-[20px] p-6">
                   <h2 className="text-2xl font-bold text-slate-950">还没有穿搭日记</h2>
                   <p className="mt-3 text-slate-600">生成一次 OOTD 后，这里会自动保存并显示历史记录。</p>
                 </div>
@@ -886,19 +895,6 @@ export default function HistoryPage() {
                   deleteLabel={outfitBulkAction === "delete" ? "删除中..." : "批量删除"}
                   exportLabel={outfitBulkAction === "export" ? "导出中..." : "批量导出"}
                 />
-              )}
-
-              {!outfitBatchMode && outfitRecords.length > 0 && (
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={enterOutfitBatchMode}
-                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
-                  >
-                    <CheckSquare className="h-4 w-4" aria-hidden="true" />
-                    批量操作
-                  </button>
-                </div>
               )}
 
               <div className="mt-6 grid gap-4">
@@ -922,7 +918,7 @@ export default function HistoryPage() {
                           void openOutfitRecord(record.id);
                         }
                       }}
-                      className={`rounded-2xl border bg-white p-5 shadow-sm outline-none transition ${
+                      className={`glass-card rounded-[20px] p-5 shadow-sm outline-none transition ${
                         isSelected ? "border-indigo-400" : "border-slate-200"
                       } ${outfitBatchMode ? "" : "cursor-pointer hover:border-indigo-300 hover:shadow-md focus:ring-2 focus:ring-indigo-200"}`}
                     >
@@ -955,7 +951,7 @@ export default function HistoryPage() {
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         {record.colorPalette.slice(0, 6).map((color) => (
-                          <span key={color} className="h-8 w-8 rounded-full border border-slate-200" style={{ backgroundColor: color }} />
+                          <span key={color} className="h-8 w-8 rounded-full glass-card" style={{ backgroundColor: color }} />
                         ))}
                       </div>
 
@@ -973,7 +969,7 @@ export default function HistoryPage() {
                               void removeOutfitRecord(record.id);
                             }}
                             disabled={isDeleting}
-                            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center gap-2 glass-card rounded-[12px] border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
                             {isDeleting ? "删除中..." : "删除记录"}

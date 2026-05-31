@@ -236,8 +236,8 @@ export function UploadZone() {
   return (
     <div className="space-y-4">
       <div
-        className={`grid min-h-80 gap-6 rounded-2xl border-2 border-dashed bg-white p-5 transition md:grid-cols-[0.9fr_1.1fr] ${
-          isDragging ? "border-indigo-500 bg-indigo-50" : "border-indigo-200"
+        className={`glass-card gpu-safe grid min-h-80 gap-6 rounded-[20px] border-2 border-dashed p-6 transition md:grid-cols-[0.9fr_1.1fr] ${
+          isDragging ? "border-indigo-500 bg-indigo-50" : "border-[var(--glass-border)]"
         }`}
         onDragEnter={(event) => {
           event.preventDefault();
@@ -255,7 +255,7 @@ export function UploadZone() {
           }
         }}
       >
-        <div className="flex min-h-56 flex-col items-center justify-center rounded-xl bg-indigo-50 px-6 py-6 text-center">
+        <div className="flex min-h-56 flex-col items-center justify-center glass-card rounded-[20px] px-6 py-6 text-center">
           <input
             ref={inputRef}
             className="sr-only"
@@ -264,15 +264,15 @@ export function UploadZone() {
             disabled={isSubmitting}
             onChange={(event) => selectFile(event.target.files?.[0])}
           />
-          <Upload className="h-10 w-10 text-indigo-600" aria-hidden="true" />
-          <span className="mt-4 text-lg font-semibold text-slate-950">拖拽或点击上传照片</span>
-          <span className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+          <Upload className="h-10 w-10 text-[#578af4]" aria-hidden="true" /> {/* Change icon color */}
+          <span className="mt-4 text-lg font-semibold text-[#181698]">拖拽或点击上传照片</span> {/* Change text color */}
+          <span className="mt-2 max-w-md text-sm leading-6 text-[#667694]"> {/* Change text color */}
             建议使用正面、自然光、无遮挡照片。支持 JPG、PNG、HEIC、WebP，最大 10MB。
           </span>
           <div className="mt-5 grid w-full gap-3 sm:grid-cols-2">
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition hover:-translate-y-0.5 bg-[#578af4] text-white disabled:cursor-not-allowed disabled:bg-slate-300"
               onClick={() => inputRef.current?.click()}
               disabled={isSubmitting}
             >
@@ -281,7 +281,7 @@ export function UploadZone() {
             </button>
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl glass-card px-5 text-sm font-semibold transition hover:-translate-y-0.5 text-[#181698] disabled:cursor-not-allowed disabled:opacity-60"
               onClick={startCamera}
               disabled={isSubmitting || isCameraStarting}
             >
@@ -291,7 +291,7 @@ export function UploadZone() {
           </div>
         </div>
 
-        <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+        <div className="flex min-h-56 items-center justify-center overflow-hidden glass-card rounded-[20px]">
           {isCameraOpen ? (
             <div className="flex h-full w-full flex-col gap-3 p-3">
               <video ref={videoRef} className="min-h-52 w-full rounded-xl bg-slate-900 object-contain" playsInline muted />
@@ -300,7 +300,7 @@ export function UploadZone() {
                   type="button"
                   onClick={capturePhoto}
                   disabled={isSubmitting}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-300"
+                  className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition hover:-translate-y-0.5 bg-[#578af4] text-white disabled:bg-slate-300"
                 >
                   拍摄
                 </button>
@@ -308,7 +308,7 @@ export function UploadZone() {
                   type="button"
                   onClick={stopCamera}
                   disabled={isSubmitting}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl glass-card px-5 text-sm font-semibold transition hover:-translate-y-0.5 text-[#181698] disabled:opacity-60"
                 >
                   取消
                 </button>
@@ -318,7 +318,7 @@ export function UploadZone() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="上传照片预览" className="h-full max-h-80 w-full object-contain" />
           ) : (
-            <div className="flex flex-col items-center px-6 text-center text-slate-500">
+            <div className="flex flex-col items-center px-6 text-center text-[#667694]"> {/* Change text color */}
               <Camera className="h-10 w-10" aria-hidden="true" />
               <p className="mt-3 text-sm leading-6">照片预览会显示在这里，确认清晰后再开始诊断。</p>
             </div>
@@ -327,16 +327,16 @@ export function UploadZone() {
       </div>
 
       {file && (
-        <div className="rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm text-slate-600">
-          已选择：<span className="font-semibold text-slate-950">{file.name}</span>
+        <div className="glass-card rounded-[20px] px-4 py-3 text-sm text-[#667694]"> {/* Apply glass-card and text color */}
+          已选择：<span className="font-semibold text-[#181698]">{file.name}</span> {/* Change text color */}
         </div>
       )}
 
-      {error && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
+      {error && <p className="glass-card rounded-[20px] px-4 py-3 text-sm font-medium text-rose-600 border border-rose-300">{error}</p>} {/* Apply glass-card and red color scheme */}
       {noClearFace && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="glass-card rounded-[20px] px-4 py-3 text-sm text-amber-800 border border-amber-300"> {/* Apply glass-card and amber color scheme */}
           <p className="font-semibold">重新拍摄建议</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[#667694]"> {/* Change text color */}
             <li>请上传真人正脸照片，保持脸部正对镜头</li>
             <li>避免遮挡、墨镜、口罩</li>
             <li>避免强逆光或过暗环境</li>
@@ -348,7 +348,7 @@ export function UploadZone() {
 
       <button
         type="button"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 md:w-auto"
+        className="group inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold text-white transition hover:-translate-y-0.5 bg-[#578af4] disabled:cursor-not-allowed disabled:bg-slate-300 md:w-auto"
         disabled={isSubmitting}
         onClick={submitDiagnosis}
       >
