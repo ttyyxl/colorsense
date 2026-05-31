@@ -1,4 +1,5 @@
-﻿import { motion } from "framer-motion";
+import { motion } from "framer-motion";
+import Link from "next/link";
 import type { SeasonProfile } from "@/lib/seasons";
 
 const springTransition = { type: "spring", stiffness: 140, damping: 20 } as const;
@@ -88,47 +89,53 @@ export function SeasonPreviewStack({ seasons }: { seasons: SeasonProfile[] }) {
             cardBg: "linear-gradient(145deg, rgba(255,255,255,0.68), rgba(238,246,255,0.44))",
             glow: "rgba(129, 191, 233, 0.22)",
           };
+          const detailHref = `/season/${season.nameEn.toLowerCase()}`;
 
           return (
-            <motion.article
-              key={season.nameEn}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springTransition, delay: index * 0.04 }}
-              className="gpu-safe relative min-h-72 overflow-hidden rounded-[20px] border border-white/56 p-6 shadow-[0_24px_54px_-34px_rgba(24,22,152,0.22)] transition hover:-translate-y-1"
-              style={{ background: copy.cardBg }}
-            >
-              <div className="absolute -right-12 -top-10 h-36 w-36 rounded-full blur-3xl" style={{ backgroundColor: copy.glow }} />
-              <div className="relative flex h-full flex-col">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-3xl" aria-hidden="true">
-                      {copy.emoji}
-                    </span>
-                    <h3 className="mt-4 text-xl font-bold text-[#181698]">{copy.zhName}</h3>
-                    <p className="mt-1 text-sm font-semibold uppercase tracking-[0.14em] text-[#578af4]">{copy.enName}</p>
+            <Link key={season.nameEn} href={detailHref} className="block outline-none">
+              <motion.article
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...springTransition, delay: index * 0.04 }}
+                className="gpu-safe relative min-h-72 overflow-hidden rounded-[20px] border border-white/56 p-6 shadow-[0_24px_54px_-34px_rgba(24,22,152,0.22)] transition hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-[#578af4]/30"
+                style={{ background: copy.cardBg }}
+                aria-label={`查看 ${copy.zhName} 详细介绍`}
+              >
+                <div className="absolute -right-12 -top-10 h-36 w-36 rounded-full blur-3xl" style={{ backgroundColor: copy.glow }} />
+                <div className="relative flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="text-3xl" aria-hidden="true">
+                        {copy.emoji}
+                      </span>
+                      <h3 className="mt-4 text-xl font-bold text-[#181698]">{copy.zhName}</h3>
+                      <p className="mt-1 text-sm font-semibold uppercase tracking-[0.14em] text-[#578af4]">{copy.enName}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-white/52 p-1.5 ring-1 ring-[#81bfe9]/20">
+                      {copy.colors.map((color) => (
+                        <span key={color} className="h-10 w-10 rounded-xl shadow-sm ring-1 ring-white/70" style={{ backgroundColor: color }} title={color} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-white/52 p-1.5 ring-1 ring-[#81bfe9]/20">
-                    {copy.colors.map((color) => (
-                      <span key={color} className="h-10 w-10 rounded-xl shadow-sm ring-1 ring-white/70" style={{ backgroundColor: color }} title={color} />
-                    ))}
+
+                  <span className="mt-5 inline-flex w-fit rounded-xl bg-white/46 px-3 py-1.5 text-xs font-semibold text-[#181698] ring-1 ring-[#81bfe9]/18">
+                    {copy.attribute}
+                  </span>
+                  <p className="mt-4 text-sm font-light leading-6 text-[#667694]">{copy.description}</p>
+
+                  <div className="mt-auto flex items-center justify-between gap-3 pt-6">
+                    <div className="grid flex-1 grid-cols-3 gap-2">
+                      {copy.keywords.map((keyword) => (
+                        <span key={keyword} className="rounded-xl bg-[#eef6ff]/72 px-3 py-2 text-center text-xs font-semibold text-[#181698] ring-1 ring-[#81bfe9]/18">
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-xs font-semibold text-[#578af4]">查看详情</span>
                   </div>
                 </div>
-
-                <span className="mt-5 inline-flex w-fit rounded-xl bg-white/46 px-3 py-1.5 text-xs font-semibold text-[#181698] ring-1 ring-[#81bfe9]/18">
-                  {copy.attribute}
-                </span>
-                <p className="mt-4 text-sm font-light leading-6 text-[#667694]">{copy.description}</p>
-
-                <div className="mt-auto grid grid-cols-3 gap-2 pt-6">
-                  {copy.keywords.map((keyword) => (
-                    <span key={keyword} className="rounded-xl bg-[#eef6ff]/72 px-3 py-2 text-center text-xs font-semibold text-[#181698] ring-1 ring-[#81bfe9]/18">
-                      {keyword}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </motion.article>
+              </motion.article>
+            </Link>
           );
         })}
       </div>

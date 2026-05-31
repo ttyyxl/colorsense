@@ -228,6 +228,44 @@ export default function OutfitPage() {
           source: payload.source,
         }),
       );
+
+        if (currentUser) {
+          try {
+            const token = await currentUser.getIdToken(true);
+            const saveResponse = await fetch("/api/outfit-records", {
+              method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              request: requestBody,
+                result: payload.data,
+                source: payload.source,
+              }),
+            });
+
+            const savePayload = (await saveResponse.json().catch(() => ({}))) as { success?: boolean; id?: string; error?: string };
+
+            if (saveResponse.ok && savePayload.success && savePayload.id) {
+              sessionStorage.setItem(
+                "colorsense-outfit-result",
+                JSON.stringify({
+                  request: requestBody,
+                  result: payload.data,
+                  source: payload.source,
+                  outfitId: savePayload.id,
+                  resultId: savePayload.id,
+                }),
+              );
+            } else if (!saveResponse.ok) {
+              console.warn("[outfit-inspiration] record save failed", await saveResponse.text());
+            }
+          } catch (saveError) {
+            console.warn("[outfit-inspiration] record save failed", saveError);
+          }
+      }
+
       router.push("/outfit/result");
     } catch (err) {
       setError(err instanceof Error ? err.message : "生成失败，请稍后重试。");

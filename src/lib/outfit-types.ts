@@ -28,6 +28,34 @@ export interface OutfitInspirationRequest {
 
 export type OutfitInspirationResult = OutfitAiOutput;
 
+export interface OutfitHistoryRecord {
+  id: string;
+  userId: string;
+  createdAt: string;
+  source: "mock" | "ai";
+  outfitId?: string;
+  resultId?: string;
+  imageUrl?: string;
+  request: OutfitInspirationRequest;
+  result: OutfitInspirationResult;
+}
+
+export interface OutfitHistorySummary {
+  id: string;
+  createdAt: string;
+  source: "mock" | "ai";
+  outfitId?: string;
+  resultId?: string;
+  imageUrl?: string;
+  season: string;
+  scene: OutfitScene;
+  occasion: string;
+  mood: string;
+  city: string;
+  theme: string;
+  colorPalette: string[];
+}
+
 export interface OutfitInspirationResponse {
   success: true;
   data: OutfitInspirationResult;
