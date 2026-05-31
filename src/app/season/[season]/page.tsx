@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { FooterGradient } from "@/components/home/FooterGradient";
 import { SEASON_INTRODUCTIONS } from "@/lib/season-introductions";
 import { SEASONS, type SeasonType } from "@/lib/seasons";
 
@@ -113,6 +114,7 @@ export default function SeasonDetailPage({ params }: { params: { season: string 
           </section>
         </div>
       </section>
+      <FooterGradient />
     </main>
   );
 }

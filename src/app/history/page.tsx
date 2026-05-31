@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { FooterGradient } from "@/components/home/FooterGradient";
 import { listUserDiagnoses } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
@@ -724,7 +725,7 @@ export default function HistoryPage() {
         <section className="mx-auto max-w-5xl px-6 py-12">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="mt-2 text-4xl font-bold text-slate-950">历史记录</h1>
+              <h1 className="mt-2 text-4xl font-extrabold leading-tight text-[#181698]">历史记录</h1>
             </div>
           </div>
 
@@ -989,6 +990,7 @@ export default function HistoryPage() {
             </div>
           )}
         </section>
+        <FooterGradient />
       </main>
     </ProtectedRoute>
   );

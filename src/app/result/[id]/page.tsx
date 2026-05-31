@@ -17,6 +17,8 @@ import { FooterGradient } from "@/components/home/FooterGradient"; // Import Foo
 import { motion } from "framer-motion"; // Import motion
 
 const springTransition = { type: "spring", stiffness: 140, damping: 20 } as const; // Define springTransition
+const resultActionCardClassName =
+  "inline-flex min-h-[88px] w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-4 text-center text-sm font-semibold text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:text-indigo-700";
 
 const SCORE_LABELS = {
   spring: "Spring / 春",
@@ -170,20 +172,22 @@ export default function ResultPage({ params }: ResultPageProps) {
                     <DoubaoAdviceSection advice={diagnosis.doubaoAdvice} />
                   )}
                 </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"> {/* Adjusted grid for better responsiveness */}
-                  <ShareModal diagnosisId={id} cardRef={cardRef} />
+                <div className="mt-6 grid justify-center gap-3 sm:grid-cols-2 lg:grid-cols-4"> {/* Adjusted grid for better responsiveness */}
+                  <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.05 }}>
+                    <ShareModal diagnosisId={id} cardRef={cardRef} />
+                  </motion.div>
                   <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.1 }}>
-                    <Link href="/upload" className="group inline-flex h-full w-full items-center justify-center rounded-[20px] glass-card px-5 py-3 text-sm font-semibold text-[#181698] transition hover:-translate-y-0.5">
+                    <Link href="/upload" className={resultActionCardClassName}>
                       重新诊断
                     </Link>
                   </motion.div>
                   <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.15 }}>
-                    <Link href="/history" className="group inline-flex h-full w-full items-center justify-center rounded-[20px] glass-card px-5 py-3 text-sm font-semibold text-[#181698] transition hover:-translate-y-0.5">
+                    <Link href="/history" className={resultActionCardClassName}>
                       查看历史
                     </Link>
                   </motion.div>
                   <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.2 }}>
-                    <Link href="/outfit" className="group inline-flex h-full w-full items-center justify-center rounded-[20px] glass-card px-5 py-3 text-sm font-semibold text-[#181698] transition hover:-translate-y-0.5">
+                    <Link href="/outfit" className={resultActionCardClassName}>
                       生成今日 OOTD
                     </Link>
                   </motion.div>

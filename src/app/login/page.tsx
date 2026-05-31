@@ -1,5 +1,6 @@
 import { AuthForm } from "@/components/AuthForm";
 import { Navbar } from "@/components/Navbar";
+import { FooterGradient } from "@/components/home/FooterGradient";
 
 interface LoginPageProps {
   searchParams?: { next?: string };
@@ -22,6 +23,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           <AuthForm nextPath={nextPath} />
         </div>
       </section>
+      <FooterGradient />
     </main>
   );
 }

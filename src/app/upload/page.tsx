@@ -32,7 +32,7 @@ export default function UploadPage() {
               上传一张清晰正面照
             </h1>
             <p className="mt-4 max-w-xl text-base font-light leading-8 text-[#667694]">
-              上传后会调用诊断接口；如果本地 Python 推理服务还没启动，会先用后端 fallback 结果跑通完整链路。
+              上传一张正面照片，模型将自动为您推理季型，AI 汇总得出您的专属风格建议。
             </p>
             <div className="mt-8">
               <UploadZone />

@@ -75,9 +75,9 @@ export function ShareModal({ diagnosisId, cardRef }: ShareModalProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="flex min-h-[88px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-4 text-center shadow-sm">
       <div
-        className={`font-semibold text-indigo-700 ${isSaving ? "opacity-50 cursor-wait" : "cursor-pointer hover:text-indigo-700"}`}
+        className={`text-sm font-semibold text-indigo-700 ${isSaving ? "cursor-wait opacity-50" : "cursor-pointer hover:text-indigo-700"}`}
         onClick={!isSaving ? saveCard : undefined}
       >
         保存结果卡片

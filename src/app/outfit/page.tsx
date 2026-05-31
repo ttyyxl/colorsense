@@ -440,6 +440,7 @@ export default function OutfitPage() {
             </button>
           </div>
         </section>
+        <FooterGradient />
       </main>
     </ProtectedRoute>
   );

@@ -6,6 +6,7 @@ import html2canvas from "html2canvas-pro";
 import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { FooterGradient } from "@/components/home/FooterGradient";
 import { useAuth } from "@/lib/useAuth";
 import type { OutfitInspirationApiResponse, OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
 
@@ -434,6 +435,7 @@ export default function OutfitResultPage() {
             </div>
           )}
         </section>
+        <FooterGradient />
       </main>
     </ProtectedRoute>
   );
