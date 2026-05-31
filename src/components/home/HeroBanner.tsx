@@ -156,9 +156,6 @@ export function HeroBanner({ primaryActions }: { primaryActions: HomeRouteAction
                   </AnimatePresence>
                 </div>
               </div>
-              <motion.span layout className="rounded-xl bg-white/54 px-3 py-1 text-xs font-semibold text-[#181698] ring-1 ring-[#81bfe9]/24">
-                实时预览
-              </motion.span>
             </div>
 
             <motion.div layout className="mt-7 grid grid-cols-4 overflow-hidden rounded-[20px] ring-1 ring-white/60">
