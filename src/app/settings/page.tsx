@@ -100,7 +100,7 @@ function SettingsContent() {
 
         <div className="relative mt-8 grid gap-6">
           <form onSubmit={changePassword} className="rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur">
-            <SectionHeading icon={<KeyRound className="h-5 w-5" aria-hidden="true" />} title={<>&#x4fee;&#x6539;&#x5bc6;&#x7801;</>} description={<>&#x4fee;&#x6539;&#x524d;&#x9700;&#x8981;&#x9a8c;&#x8bc1;&#x5f53;&#x524d;&#x5bc6;&#x7801;&#x3002;&#x5bc6;&#x7801;&#x53ea;&#x7531; Firebase Auth &#x5904;&#x7406;&#xff0c;&#x4e0d;&#x4f1a;&#x4fdd;&#x5b58;&#x5230;&#x6570;&#x636e;&#x5e93;&#x3002;</>} />
+            <SectionHeading icon={<KeyRound className="h-5 w-5" aria-hidden="true" />} title={<>&#x4fee;&#x6539;&#x5bc6;&#x7801;</>} description={<>修改当前账户密码，下次登录使用新密码。</>} />
             {passwordNotice && <NoticeMessage notice={passwordNotice} />}
             <div className="mt-5 grid gap-4">
               <PasswordField label={<>&#x5f53;&#x524d;&#x5bc6;&#x7801;</>} value={currentPassword} autoComplete="current-password" onChange={setCurrentPassword} />

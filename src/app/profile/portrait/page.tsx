@@ -95,7 +95,7 @@ function PortraitProfileContent() {
             <p className="text-sm font-semibold text-indigo-700">个人肖像档案</p>
             <h1 className="mt-2 text-3xl font-bold text-slate-950">查看你的个人画像信息</h1>
             <p className="mt-4 leading-7 text-slate-600">
-              问卷结果和最近一次季型诊断会集中展示在这里，检测页面只保留上传和结果相关内容。
+              问卷结果和最近一次季型诊断可在本页查看，修改个人问卷信息可点击修改问卷重新填写。
             </p>
           </div>
           {profile && (
