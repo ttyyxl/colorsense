@@ -219,6 +219,11 @@ export default function OutfitResultPage() {
     async function loadRecord() {
       setError("");
       try {
+        if (!currentUser) {
+          setError("请先登录后查看穿搭记录。");
+          return;
+        }
+
         const token = await currentUser.getIdToken(true);
         const response = await fetch(`/api/outfit-records/${encodeURIComponent(recordId)}`, {
           headers: { Authorization: `Bearer ${token}` },

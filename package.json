@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.99.0",
+    "@emotion/is-prop-valid": "^1.4.0",
     "@google/generative-ai": "^0.24.1",
     "@uiw/color-convert": "^2.10.3",
     "@uiw/react-color": "^2.10.3",
