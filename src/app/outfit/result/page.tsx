@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Palette, RefreshCw, Shirt, Sparkles } from "lucide-react";
 import html2canvas from "html2canvas-pro";
 import { useEffect, useRef, useState } from "react";
@@ -8,7 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FooterGradient } from "@/components/home/FooterGradient";
 import { useAuth } from "@/lib/useAuth";
-import type { OutfitInspirationApiResponse, OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
+import type { OutfitHistoryRecord, OutfitInspirationApiResponse, OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
 
 interface StoredOutfitResult {
   request: OutfitInspirationRequest;
@@ -140,6 +141,18 @@ function isRequestReady(request: OutfitInspirationRequest) {
   return Boolean(request.season && request.occasion && request.mood);
 }
 
+function storedFromRecord(record: OutfitHistoryRecord): StoredOutfitResult {
+  return {
+    request: record.request,
+    result: record.result,
+    source: record.source,
+    outfitId: record.outfitId ?? record.id,
+    resultId: record.resultId ?? record.id,
+    imageUrl: record.imageUrl,
+    createdAt: record.createdAt,
+  };
+}
+
 async function persistOutfitRecord(
   token: string,
   payload: {
@@ -172,6 +185,8 @@ async function persistOutfitRecord(
 }
 
 export default function OutfitResultPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentUser } = useAuth();
   const contentRef = useRef<HTMLDivElement>(null);
   const [stored, setStored] = useState<StoredOutfitResult | null>(null);
@@ -179,6 +194,7 @@ export default function OutfitResultPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const recordId = searchParams.get("id")?.trim() ?? "";
 
   useEffect(() => {
     const raw = sessionStorage.getItem("colorsense-outfit-result");
@@ -192,6 +208,44 @@ export default function OutfitResultPage() {
       sessionStorage.removeItem("colorsense-outfit-result");
     }
   }, []);
+
+  useEffect(() => {
+    if (!recordId || !currentUser) {
+      return;
+    }
+
+    let ignore = false;
+
+    async function loadRecord() {
+      setError("");
+      try {
+        const token = await currentUser.getIdToken(true);
+        const response = await fetch(`/api/outfit-records/${encodeURIComponent(recordId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = (await response.json().catch(() => ({}))) as { success?: boolean; record?: OutfitHistoryRecord; error?: string };
+        if (!response.ok || !payload.success || !payload.record) {
+          throw new Error(payload.error ?? "OUTFIT_DETAIL_FAILED");
+        }
+
+        const nextStored = storedFromRecord(payload.record);
+        if (!ignore) {
+          setStored(nextStored);
+          sessionStorage.setItem("colorsense-outfit-result", JSON.stringify(nextStored));
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError instanceof Error ? loadError.message : "绌挎惌鏃ヨ璇︽儏璇诲彇澶辫触锛岃绋嶅悗閲嶈瘯銆?");
+        }
+      }
+    }
+
+    void loadRecord();
+
+    return () => {
+      ignore = true;
+    };
+  }, [currentUser, recordId]);
 
   async function saveResult() {
     const card = contentRef.current;
@@ -296,6 +350,10 @@ export default function OutfitResultPage() {
       setStored(nextStored);
       sessionStorage.setItem("colorsense-outfit-result", JSON.stringify(nextStored));
       setNotice("已重新生成新的穿搭结果，并写入历史记录。");
+      const nextId = nextStored.resultId || nextStored.outfitId;
+      if (nextId) {
+        router.push(`/outfit/result?id=${encodeURIComponent(nextId)}`);
+      }
     } catch (regenError) {
       setError(regenError instanceof Error ? regenError.message : "重新生成失败，请稍后重试。");
     } finally {
