@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Palette, RefreshCw, Shirt, Sparkles } from "lucide-react";
 import html2canvas from "html2canvas-pro";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FooterGradient } from "@/components/home/FooterGradient";
@@ -184,7 +184,7 @@ async function persistOutfitRecord(
   return responsePayload.id ?? payload.recordId ?? "";
 }
 
-export default function OutfitResultPage() {
+function OutfitResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser } = useAuth();
@@ -501,6 +501,14 @@ export default function OutfitResultPage() {
         <FooterGradient />
       </main>
     </ProtectedRoute>
+  );
+}
+
+export default function OutfitResultPage() {
+  return (
+    <Suspense fallback={<div>正在加载穿搭结果...</div>}>
+      <OutfitResultContent />
+    </Suspense>
   );
 }
 
