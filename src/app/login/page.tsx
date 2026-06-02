@@ -203,7 +203,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
 
           {currentUser && !currentUser.emailVerified && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-              <p>当前账号已登录，但邮箱尚未完成验证。请在邮箱中点击验证链接，回到本页后系统会自动检查。</p>
+              <p>请在邮箱中点击验证链接，回到本页后系统会自动检查。</p>
               <button
                 type="button"
                 onClick={() => void checkVerificationStatus(true)}
