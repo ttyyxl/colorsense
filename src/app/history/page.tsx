@@ -50,6 +50,27 @@ function waitForPaint() {
   });
 }
 
+async function waitForExportAssets(element: HTMLElement) {
+  await waitForPaint();
+  if ("fonts" in document) {
+    await document.fonts.ready;
+  }
+
+  const images = Array.from(element.querySelectorAll("img"));
+  await Promise.all(
+    images.map((image) => {
+      if (image.complete) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => resolve(), { once: true });
+      });
+    }),
+  );
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -86,9 +107,10 @@ function diagnosisPngName(diagnosis: Diagnosis) {
   return `diagnosis-${diagnosis.seasonType}-${created || diagnosis.id}.png`;
 }
 
-function outfitPngName(record: OutfitHistorySummary) {
+function outfitPngName(record: OutfitHistorySummary | OutfitHistoryRecord) {
   const created = safeFilePart(record.createdAt || record.id);
-  return `outfit-${safeFilePart(record.theme || record.id)}-${created || record.id}.png`;
+  const theme = "theme" in record ? record.theme : record.result.theme;
+  return `outfit-${safeFilePart(theme || record.id)}-${created || record.id}.png`;
 }
 
 function ExportDiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
@@ -175,35 +197,44 @@ function ExportDiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   );
 }
 
-function ExportOutfitCard({ record }: { record: OutfitHistorySummary }) {
+function ExportOutfitCard({ record }: { record: OutfitHistoryRecord }) {
+  const request = record.request;
+  const result = record.result;
+  const summary = {
+    theme: result.theme,
+    season: request.season,
+    occasion: request.occasion,
+    mood: request.mood,
+    city: request.weather?.city ?? "",
+    scene: request.scene,
+    colorPalette: result.color_palette,
+  };
   return (
     <div id={`export-outfit-card-${record.id}`} className="w-[900px] space-y-5 bg-white p-8 text-slate-900" style={{ fontFamily: "Arial, sans-serif" }}>
       <header className="rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 p-6 text-white">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-100">ColorSense</p>
-        <h2 className="mt-2 text-3xl font-bold">{record.theme || "穿搭日记"}</h2>
+        <h2 className="mt-2 text-3xl font-bold">{summary.theme || "穿搭日记"}</h2>
         <p className="mt-2 text-indigo-100">
-          {record.season || "未知季型"} / {record.occasion || "未知场合"} / {record.mood || "未知心情"}
+          {summary.season || "未知季型"} / {summary.occasion || "未知场合"} / {summary.mood || "未知心情"}
         </p>
       </header>
 
-      {record.imageUrl ? (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <img src={record.imageUrl} alt="" className="block h-auto w-full" />
-        </section>
-      ) : null}
-
       <section className="rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-lg font-bold">穿搭摘要</h3>
-        <p className="mt-3 leading-7 text-slate-700">
-          {record.city ? `${record.city} / ` : ""}
-          {record.scene === "travel" ? "旅行" : "日常"}场景下的穿搭日记，围绕 {record.occasion || "场合"} 和 {record.mood || "心情"} 生成。
-        </p>
+        <h3 className="text-lg font-bold">基本信息</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <ExportMeta label="季型" value={summary.season || "未知季型"} />
+          <ExportMeta label="场景" value={summary.scene === "travel" ? "旅行" : "日常"} />
+          <ExportMeta label="场合" value={summary.occasion || "未知场合"} />
+          <ExportMeta label="心情" value={summary.mood || "未知心情"} />
+          <ExportMeta label="城市" value={summary.city || "未填写"} />
+          <ExportMeta label="天气" value={request.weather?.condition || "未填写"} />
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 p-5">
         <h3 className="text-lg font-bold">推荐色彩</h3>
         <div className="mt-3 flex flex-wrap gap-3">
-          {record.colorPalette.map((color) => (
+          {summary.colorPalette.map((color) => (
             <div key={color} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
               <span className="h-8 w-8 rounded-full border border-slate-200" style={{ backgroundColor: color }} />
               <span className="text-sm">{color}</span>
@@ -212,7 +243,47 @@ function ExportOutfitCard({ record }: { record: OutfitHistorySummary }) {
         </div>
       </section>
 
+      <section className="rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-lg font-bold">搭配卡片</h3>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <ExportItem label="上装" value={result.item_recommendations.top} />
+          <ExportItem label="下装" value={result.item_recommendations.bottom} />
+          <ExportItem label="外套" value={result.item_recommendations.outerwear} />
+          <ExportItem label="鞋子" value={result.item_recommendations.shoes} />
+          <ExportItem label="包袋" value={result.item_recommendations.bag} />
+          <ExportItem label="配饰" value={result.item_recommendations.accessories} />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-lg font-bold">妆容建议</h3>
+        <p className="mt-3 leading-7 text-slate-700">{result.makeup_advice || "暂无妆容建议。"}</p>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-lg font-bold">推荐原因</h3>
+        <p className="mt-3 leading-7 text-slate-700">{result.reason || "暂无推荐说明。"}</p>
+      </section>
+
       <footer className="text-sm text-slate-500">Record ID: {record.id} / Created at: {new Date(record.createdAt).toLocaleString("zh-CN")}</footer>
+    </div>
+  );
+}
+
+function ExportMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 leading-7 text-slate-800">{value || "未填写"}</p>
+    </div>
+  );
+}
+
+function ExportItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 leading-7 text-slate-800">{value || "暂无建议"}</p>
     </div>
   );
 }
@@ -331,6 +402,7 @@ export default function HistoryPage() {
   const [selectedOutfitIds, setSelectedOutfitIds] = useState<Set<string>>(new Set());
   const [outfitBulkAction, setOutfitBulkAction] = useState<BulkAction>(null);
   const [outfitExportProgress, setOutfitExportProgress] = useState("");
+  const [outfitExportRecords, setOutfitExportRecords] = useState<OutfitHistoryRecord[]>([]);
   const [deletingOutfitId, setDeletingOutfitId] = useState<string | null>(null);
 
   const selectedDiagnoses = useMemo(() => diagnoses.filter((item) => selectedDiagnosisIds.has(item.id)), [diagnoses, selectedDiagnosisIds]);
@@ -684,21 +756,44 @@ export default function HistoryPage() {
 
   async function batchExportOutfits() {
     if (selectedOutfits.length === 0) return;
+    if (!currentUser) {
+      setOutfitError("登录状态已过期，请重新登录后再导出穿搭日记。");
+      return;
+    }
     setOutfitBulkAction("export");
     setOutfitError("");
     setOutfitNotice("");
     try {
-      await waitForPaint();
-      const zip = new JSZip();
+      const token = await currentUser.getIdToken(true);
+      const fullRecords: OutfitHistoryRecord[] = [];
       for (let index = 0; index < selectedOutfits.length; index += 1) {
         const record = selectedOutfits[index];
+        setOutfitExportProgress(`正在读取 ${index + 1} / ${selectedOutfits.length}`);
+        const response = await fetch(`/api/outfit-records/${encodeURIComponent(record.id)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = (await response.json().catch(() => ({}))) as OutfitDetailResponse;
+        if (!response.ok || !payload.success || !payload.record) {
+          throw new Error(payload.error ?? "OUTFIT_DETAIL_FAILED");
+        }
+        fullRecords.push(payload.record);
+      }
+
+      setOutfitExportRecords(fullRecords);
+      await waitForPaint();
+      const zip = new JSZip();
+      for (let index = 0; index < fullRecords.length; index += 1) {
+        const record = fullRecords[index];
         setOutfitExportProgress(`正在导出 ${index + 1} / ${selectedOutfits.length}`);
         const element = document.getElementById(`export-outfit-card-${record.id}`);
         if (!element) throw new Error(`Export card not found: ${record.id}`);
+        await waitForExportAssets(element);
         const canvas = await html2canvas(element, {
           backgroundColor: "#ffffff",
           scale: 2,
           useCORS: true,
+          windowWidth: element.scrollWidth,
+          windowHeight: element.scrollHeight,
           logging: process.env.NODE_ENV !== "production",
         });
         zip.file(outfitPngName(record), await canvasToBlob(canvas));
@@ -715,6 +810,7 @@ export default function HistoryPage() {
     } finally {
       setOutfitBulkAction(null);
       setOutfitExportProgress("");
+      setOutfitExportRecords([]);
     }
   }
 
@@ -983,7 +1079,7 @@ export default function HistoryPage() {
               </div>
 
               <div className="pointer-events-none fixed left-[-10000px] top-0" aria-hidden="true">
-                {selectedOutfits.map((record) => (
+                {outfitExportRecords.map((record) => (
                   <ExportOutfitCard key={record.id} record={record} />
                 ))}
               </div>

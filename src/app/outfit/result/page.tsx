@@ -277,23 +277,28 @@ function OutfitResultContent() {
         request: stored?.request ?? EMPTY_REQUEST,
         result: stored?.result ?? EMPTY_RESULT,
         source: stored?.source ?? "ai",
-        imageUrl,
       };
 
       let recordId = stored?.outfitId || stored?.resultId || "";
       if (currentUser) {
-        const token = await currentUser.getIdToken(true);
-        recordId = await persistOutfitRecord(token, {
-          ...nextRecord,
-          recordId,
-        });
+        try {
+          const token = await currentUser.getIdToken(true);
+          recordId = await persistOutfitRecord(token, {
+            ...nextRecord,
+            recordId,
+          });
+        } catch (syncError) {
+          console.warn("[outfit-result-save] PNG downloaded but history sync failed", {
+            message: syncError instanceof Error ? syncError.message : String(syncError),
+          });
+        }
       }
 
       const nextStored: StoredOutfitResult = {
         request: nextRecord.request,
         result: nextRecord.result,
         source: nextRecord.source,
-        imageUrl,
+        imageUrl: stored?.imageUrl,
         createdAt: stored?.createdAt ?? new Date().toISOString(),
         outfitId: recordId || stored?.outfitId,
         resultId: recordId || stored?.resultId,
@@ -301,7 +306,7 @@ function OutfitResultContent() {
 
       setStored(nextStored);
       sessionStorage.setItem("colorsense-outfit-result", JSON.stringify(nextStored));
-      setNotice("PNG 已下载，结果也已同步保存。");
+      setNotice("PNG 已下载。");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "保存失败，请稍后重试。");
     } finally {
