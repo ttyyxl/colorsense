@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/useAuth";
 
 const navItems = [
   { href: "/", label: "返回首页" },
-  { href: "/community", label: "社区" },
+  { href: "/community", label: "美学社区" },
   { href: "/upload", label: "开始诊断" },
   { href: "/outfit", label: "穿搭灵感" },
   { href: "/history", label: "历史记录" },
