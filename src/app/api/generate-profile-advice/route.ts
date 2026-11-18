@@ -1,28 +1,22 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-server";
-import { getAdminDb } from "@/lib/firebase-admin";
 import { generateProfileAdvice } from "@/lib/ai";
-import { UserStyleProfile } from "@/lib/user-profile-types"; // Import UserStyleProfile type
+import { getUserProfile, saveGeneratedProfileAdvice } from "@/lib/server/user-profiles";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST() {
   const user = await verifyAuth();
   if (!user) {
     return NextResponse.json({ success: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const profileRef = db.collection("users").doc(user.uid).collection("profile").doc("questionnaire");
-
   try {
-    const profileSnapshot = await profileRef.get();
+    const profile = await getUserProfile(user.uid);
 
-    if (!profileSnapshot.exists) {
+    if (!profile) {
       return NextResponse.json({ success: false, error: "PROFILE_NOT_FOUND" }, { status: 404 });
     }
-
-    const profile = profileSnapshot.data() as UserStyleProfile;
 
     if (!profile.promptContext?.summaryText) {
       return NextResponse.json({ success: false, error: "PROMPT_CONTEXT_MISSING" }, { status: 400 });
@@ -32,14 +26,7 @@ export async function POST(request: Request) {
 
     const advice = await generateProfileAdvice(profile.promptContext.summaryText);
 
-    // Save the generated advice back to the user's profile
-    await profileRef.set(
-      {
-        generatedProfileAdvice: advice, // Store the AI generated advice
-        updatedAt: new Date(),
-      },
-      { merge: true },
-    );
+    await saveGeneratedProfileAdvice(user.uid, advice);
 
     return NextResponse.json({
       success: true,

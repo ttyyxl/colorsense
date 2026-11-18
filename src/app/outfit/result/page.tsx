@@ -9,6 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FooterGradient } from "@/components/home/FooterGradient";
 import { useAuth } from "@/lib/useAuth";
+import { getAuthToken } from "@/lib/client/api";
 import type { OutfitHistoryRecord, OutfitInspirationApiResponse, OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
 
 interface StoredOutfitResult {
@@ -224,7 +225,7 @@ function OutfitResultContent() {
           return;
         }
 
-        const token = await currentUser.getIdToken(true);
+        const token = await getAuthToken();
         const response = await fetch(`/api/outfit-records/${encodeURIComponent(recordId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -282,7 +283,10 @@ function OutfitResultContent() {
       let recordId = stored?.outfitId || stored?.resultId || "";
       if (currentUser) {
         try {
-          const token = await currentUser.getIdToken(true);
+          const token = await getAuthToken();
+          if (!token) {
+            throw new Error("登录已过期，请重新登录。");
+          }
           recordId = await persistOutfitRecord(token, {
             ...nextRecord,
             recordId,
@@ -347,7 +351,10 @@ function OutfitResultContent() {
       };
 
       if (currentUser) {
-        const token = await currentUser.getIdToken(true);
+        const token = await getAuthToken();
+        if (!token) {
+          throw new Error("登录已过期，请重新登录。");
+        }
         const recordId = await persistOutfitRecord(token, {
           request,
           result: nextResult,

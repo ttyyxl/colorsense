@@ -1,4 +1,7 @@
-﻿import { auth, isFirebaseConfigured } from "@/lib/firebase";
+"use client";
+
+import { getCloudBaseAuth, isCloudBaseConfigured } from "@/lib/cloudbase";
+import { getAuthToken } from "@/lib/client/api";
 
 export type Notice = { type: "success" | "error"; text: string } | null;
 
@@ -13,17 +16,13 @@ export function getAppUrl() {
   return "http://localhost:3000";
 }
 
-export function getVerificationReturnUrl() {
-  return `${getAppUrl()}/login?verified=1`;
-}
-
 export async function resolveNextPath(defaultPath: string) {
-  if (!auth?.currentUser) {
+  const token = await getAuthToken();
+  if (!token) {
     return defaultPath;
   }
 
   try {
-    const token = await auth.currentUser.getIdToken();
     const response = await fetch("/api/user-profile", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -39,8 +38,8 @@ export async function resolveNextPath(defaultPath: string) {
 }
 
 export function canSubmit(email: string, password: string, setNotice: (notice: Notice) => void) {
-  if (!isFirebaseConfigured() || !auth) {
-    setNotice({ type: "error", text: "尚未配置 Firebase 环境变量，请先完成本地配置。" });
+  if (!isCloudBaseConfigured() || !getCloudBaseAuth()) {
+    setNotice({ type: "error", text: "尚未配置 CloudBase 环境变量，请先完成本地配置。" });
     return false;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {

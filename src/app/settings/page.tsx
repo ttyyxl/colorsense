@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
+import { changePassword as changePasswordRequest } from "@/lib/auth-client";
 import { KeyRound, LogOut } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { FooterGradient } from "@/components/home/FooterGradient";
@@ -47,7 +47,7 @@ function SettingsContent() {
     event.preventDefault();
     setPasswordNotice(null);
 
-    if (!currentUser || !currentUser.email) {
+    if (!currentUser) {
       setPasswordNotice({ type: "error", text: TEXT.loginExpiredChangePassword });
       return;
     }
@@ -66,9 +66,7 @@ function SettingsContent() {
 
     setSavingPassword(true);
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
-      await reauthenticateWithCredential(currentUser, credential);
-      await updatePassword(currentUser, newPassword);
+      await changePasswordRequest(currentPassword, newPassword);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -165,19 +163,8 @@ function PasswordField({ label, value, autoComplete, onChange }: { label: React.
 }
 
 function getPasswordErrorMessage(error: unknown) {
-  const errorCode = getErrorCode(error);
-  if (errorCode === "auth/wrong-password" || errorCode === "auth/invalid-credential") {
-    return TEXT.currentPasswordWrong;
-  }
-  if (errorCode === "auth/weak-password") {
-    return TEXT.newPasswordShort;
-  }
-  if (errorCode === "auth/requires-recent-login" || errorCode === "auth/user-token-expired") {
-    return TEXT.loginExpiredChangePassword;
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
   return TEXT.passwordUpdateFailed;
-}
-
-function getErrorCode(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
 }

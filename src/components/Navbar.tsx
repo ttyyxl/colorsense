@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ const navItems = [
 export function Navbar() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { accountLabel, currentUser, isAuthenticated, logout: firebaseLogout } = useAuth();
+  const { accountLabel, currentUser, isAuthenticated, logout: authLogout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export function Navbar() {
 
   async function logout() {
     setMenuOpen(false);
-    await firebaseLogout();
+    await authLogout();
     router.push("/login");
     router.refresh();
   }

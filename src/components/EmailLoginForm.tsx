@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithPassword } from "@/lib/auth-client";
+import { useAuth } from "@/lib/useAuth";
 import { Notice, resolveNextPath, canSubmit } from "./auth-utils";
 
 interface EmailLoginFormProps {
@@ -12,6 +12,7 @@ interface EmailLoginFormProps {
 
 export function EmailLoginForm({ nextPath }: EmailLoginFormProps) {
   const router = useRouter();
+  const { refreshCurrentUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
@@ -25,17 +26,12 @@ export function EmailLoginForm({ nextPath }: EmailLoginFormProps) {
     setPending(true);
     setNotice(null);
     try {
-      const credential = await signInWithEmailAndPassword(auth!, email.trim(), password);
-      await credential.user.reload();
-      if (!credential.user.emailVerified) {
-        await signOut(auth!);
-        setNotice({ type: "error", text: "请先前往邮箱完成验证。" });
-        return;
-      }
+      await signInWithPassword(email, password);
+      await refreshCurrentUser();
       router.push(await resolveNextPath(nextPath));
       router.refresh();
-    } catch {
-      setNotice({ type: "error", text: "登录失败，请检查邮箱和密码。" });
+    } catch (error) {
+      setNotice({ type: "error", text: error instanceof Error ? error.message : "登录失败，请检查邮箱和密码。" });
     } finally {
       setPending(false);
     }

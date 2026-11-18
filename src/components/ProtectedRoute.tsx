@@ -3,10 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
-
-function canUseProtectedPages(providerIds: string[], emailVerified: boolean) {
-  return emailVerified || providerIds.includes("google.com");
-}
+import { getAuthToken } from "@/lib/client/api";
 
 function requiresCompletedQuestionnaire(pathname: string) {
   return ["/upload", "/history", "/processing", "/result", "/outfit"].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -17,9 +14,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { currentUser, loading } = useAuth();
   const [checkingQuestionnaire, setCheckingQuestionnaire] = useState(false);
-  const authorized =
-    Boolean(currentUser) &&
-    canUseProtectedPages(currentUser?.providerData.map((provider) => provider.providerId) ?? [], currentUser?.emailVerified ?? false);
+  const authorized = Boolean(currentUser) && currentUser?.emailVerified === true;
 
   useEffect(() => {
     if (!loading && !authorized) {
@@ -38,9 +33,9 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
       setCheckingQuestionnaire(true);
       try {
-        const token = await currentUser.getIdToken();
+        const token = await getAuthToken();
         const response = await fetch("/api/user-profile", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const payload = (await response.json()) as { success?: boolean; onboardingCompleted?: boolean; profile?: unknown };
         if (!active) {

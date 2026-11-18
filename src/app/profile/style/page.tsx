@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { StyleProfileForm } from "@/components/profile/StyleProfileForm";
-import { auth } from "@/lib/firebase";
+import { getAuthToken } from "@/lib/client/api";
 import type { UserStyleProfile } from "@/lib/user-profile-types";
 
 interface LatestDiagnosis {
@@ -31,14 +31,14 @@ function ProfileStyleContent() {
   const [editing, setEditing] = useState(false);
 
   async function loadProfile() {
-    if (!auth?.currentUser) {
+    const token = await getAuthToken();
+    if (!token) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      const token = await auth.currentUser.getIdToken();
       const [profileResponse, diagnosisResponse] = await Promise.all([
         fetch("/api/user-profile", {
           headers: { Authorization: `Bearer ${token}` },

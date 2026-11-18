@@ -4,6 +4,7 @@ import { Camera, Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
+import { getAuthToken } from "@/lib/client/api";
 import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -186,7 +187,7 @@ export function UploadZone() {
         throw new Error("登录已过期，请重新登录。");
       }
 
-      const idToken = await currentUser.getIdToken(true);
+      const idToken = await getAuthToken();
 
       const response = await fetch("/api/diagnose", {
         method: "POST",

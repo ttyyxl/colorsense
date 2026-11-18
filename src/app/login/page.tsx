@@ -1,15 +1,12 @@
-﻿"use client";
+"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
 import { FooterGradient } from "@/components/home/FooterGradient";
 import { EmailLoginForm } from "@/components/EmailLoginForm";
 import { EmailRegisterForm } from "@/components/EmailRegisterForm";
-import { GoogleAuthSection } from "@/components/GoogleAuthSection";
 import { resolveNextPath, Notice } from "@/components/auth-utils";
-import { auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/useAuth";
 
 interface LoginPageProps {
@@ -18,104 +15,23 @@ interface LoginPageProps {
 
 type AuthMode = "login" | "register";
 
-function canUseProtectedPages(providerIds: string[], emailVerified: boolean) {
-  return emailVerified || providerIds.includes("google.com");
-}
-
 export default function LoginPage({ searchParams }: LoginPageProps) {
   const router = useRouter();
-  const { currentUser, loading, refreshCurrentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const requestedNext = searchParams?.next;
   const nextPath = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/upload";
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [notice, setNotice] = useState<Notice>(null);
-  const [checkingVerification, setCheckingVerification] = useState(false);
 
   useEffect(() => {
     const isVerificationReturn = new URLSearchParams(window.location.search).get("verified") === "1";
-    if (!isVerificationReturn || !auth) {
-      return;
+    if (isVerificationReturn) {
+      setNotice({ type: "success", text: "邮箱验证成功，请使用邮箱和密码登录。" });
     }
-
-    let active = true;
-    let unsubscribe: () => void = () => undefined;
-    setNotice({ type: "success", text: "邮箱验证成功，正在检查登录状态..." });
-
-    unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      unsubscribe();
-      if (!active) {
-        return;
-      }
-
-      if (!currentUser) {
-        setNotice({ type: "success", text: "邮箱验证成功，请使用邮箱和密码登录。" });
-        setAuthMode("login");
-        return;
-      }
-
-      try {
-        await currentUser.reload();
-        if (!active) {
-          return;
-        }
-        if (currentUser.emailVerified) {
-          router.replace(await resolveNextPath("/upload"));
-          router.refresh();
-          return;
-        }
-        setNotice({ type: "error", text: "邮箱验证状态尚未更新，请刷新页面或重新登录。" });
-      } catch {
-        if (active) {
-          setNotice({ type: "error", text: "邮箱验证状态检查失败，请刷新页面或重新登录。" });
-        }
-      }
-    });
-
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [router]);
-
-  const checkVerificationStatus = useCallback(
-    async (showPendingNotice = true) => {
-      if (!currentUser) {
-        setNotice({ type: "success", text: "邮箱验证成功后，请使用邮箱和密码登录。" });
-        setAuthMode("login");
-        return;
-      }
-
-      setCheckingVerification(true);
-      try {
-        const refreshedUser = await refreshCurrentUser();
-        const providerIds = refreshedUser?.providerData.map((provider) => provider.providerId) ?? [];
-        if (refreshedUser && canUseProtectedPages(providerIds, refreshedUser.emailVerified)) {
-          router.replace(await resolveNextPath(nextPath));
-          router.refresh();
-          return;
-        }
-
-        if (showPendingNotice) {
-          setNotice({ type: "error", text: "邮箱验证状态尚未更新，请确认已经点击邮件中的验证链接后重试。" });
-        }
-      } catch {
-        if (showPendingNotice) {
-          setNotice({ type: "error", text: "邮箱验证状态检查失败，请刷新页面或重新登录。" });
-        }
-      } finally {
-        setCheckingVerification(false);
-      }
-    },
-    [currentUser, nextPath, refreshCurrentUser, router],
-  );
+  }, []);
 
   useEffect(() => {
-    if (loading || !currentUser) {
-      return;
-    }
-
-    const providerIds = currentUser.providerData.map((provider) => provider.providerId);
-    if (!canUseProtectedPages(providerIds, currentUser.emailVerified)) {
+    if (loading || !currentUser || !currentUser.emailVerified) {
       return;
     }
 
@@ -135,29 +51,6 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       active = false;
     };
   }, [currentUser, loading, nextPath, router]);
-
-  useEffect(() => {
-    if (!currentUser || currentUser.emailVerified) {
-      return;
-    }
-
-    function handleFocus() {
-      void checkVerificationStatus(false);
-    }
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        void checkVerificationStatus(false);
-      }
-    }
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [checkVerificationStatus, currentUser]);
 
   return (
     <main className="flex min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(129,191,233,0.28),transparent_34%),linear-gradient(135deg,#f8fbff_0%,#eef6ff_45%,#f6f2ff_100%)]">
@@ -201,23 +94,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           )}
 
-          {currentUser && !currentUser.emailVerified && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-              <p>请在邮箱中点击验证链接，回到本页后系统会自动检查。</p>
-              <button
-                type="button"
-                onClick={() => void checkVerificationStatus(true)}
-                disabled={checkingVerification}
-                className="mt-3 rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
-              >
-                {checkingVerification ? "正在检查..." : "我已完成验证"}
-              </button>
-            </div>
-          )}
-
           <div className="mt-6">{authMode === "login" ? <EmailLoginForm nextPath={nextPath} /> : <EmailRegisterForm nextPath={nextPath} />}</div>
-
-          <GoogleAuthSection nextPath={nextPath} />
         </div>
       </section>
       <FooterGradient />

@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FooterGradient } from "@/components/home/FooterGradient"; // Import FooterGradient
 import { motion } from "framer-motion"; // Import motion
 import { getWeatherByCity, getWeatherByCoordinates } from "@/lib/weather";
+import { getAuthToken } from "@/lib/client/api";
 import type {
   OutfitInspirationApiResponse,
   OutfitInspirationRequest,
@@ -104,7 +105,7 @@ export default function OutfitPage() {
       setLoading(true);
       setError("");
       try {
-        const token = await currentUser.getIdToken();
+        const token = await getAuthToken();
         const [profileResponse, diagnosisResponse] = await Promise.all([
           fetch("/api/user-profile", { headers: { Authorization: `Bearer ${token}` } }),
           fetch("/api/user-profile/latest-diagnosis", { headers: { Authorization: `Bearer ${token}` } }),
@@ -235,7 +236,7 @@ export default function OutfitPage() {
 
         if (currentUser) {
           try {
-            const token = await currentUser.getIdToken(true);
+            const token = await getAuthToken();
             const saveResponse = await fetch("/api/outfit-records", {
               method: "POST",
             headers: {

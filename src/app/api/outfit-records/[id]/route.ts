@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-server";
-import { deleteUserOutfitRecord, getUserOutfitRecord, updateUserOutfitRecord } from "@/lib/firestore-outfit-records";
+import { deleteUserOutfitRecord, getUserOutfitRecord, updateUserOutfitRecord } from "@/lib/server/outfit-records";
 import type { OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
 
 interface RouteContext {

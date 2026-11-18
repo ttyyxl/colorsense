@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { saveUserProfile, getUserRow } from "@/lib/server/user-profiles";
 import { buildUserProfilePromptContext } from "@/lib/user-profile-summary";
 import type { UserStyleProfileInput } from "@/lib/user-profile-types";
 
@@ -71,21 +71,24 @@ export async function GET() {
     return NextResponse.json({ success: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(user.uid);
-  const profileRef = userRef.collection("profile").doc("questionnaire");
+  try {
+    const row = await getUserRow(user.uid);
 
-  const [userSnapshot, profileSnapshot] = await Promise.all([userRef.get(), profileRef.get()]);
-
-  return NextResponse.json({
-    success: true,
-    user: {
-      uid: user.uid,
-      email: user.email ?? userSnapshot.data()?.email ?? null,
-    },
-    onboardingCompleted: userSnapshot.data()?.onboardingCompleted === true,
-    profile: profileSnapshot.exists ? profileSnapshot.data() : null,
-  });
+    return NextResponse.json({
+      success: true,
+      user: {
+        uid: user.uid,
+        email: user.email ?? row?.email ?? null,
+      },
+      onboardingCompleted: row?.onboarding_completed === true,
+      profile: row?.profile ?? null,
+    });
+  } catch (error) {
+    console.error("[user-profile] load failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ success: false, error: "LOAD_FAILED" }, { status: 500 });
+  }
 }
 
 export async function PUT(request: Request) {
@@ -107,39 +110,11 @@ export async function PUT(request: Request) {
   }
 
   const promptContext = buildUserProfilePromptContext(profileInput);
-  const now = new Date();
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(user.uid);
-  const profileRef = userRef.collection("profile").doc("questionnaire");
 
   try {
-    await db.runTransaction(async (transaction) => {
-      const profileSnapshot = await transaction.get(profileRef);
-      transaction.set(
-        userRef,
-        {
-          email: user.email ?? null,
-          onboardingCompleted: true,
-          profileVersion: 2,
-          updatedAt: now,
-          createdAt: now,
-        },
-        { merge: true },
-      );
-      transaction.set(
-        profileRef,
-        {
-          ...profileInput,
-          aiPromptReady: true,
-          promptContext,
-          updatedAt: now,
-          createdAt: profileSnapshot.exists ? profileSnapshot.data()?.createdAt ?? now : now,
-        },
-        { merge: true },
-      );
-    });
+    await saveUserProfile(user.uid, user.email ?? null, profileInput, promptContext);
 
-    // Asynchronously trigger AI profile advice generation
+    // 异步触发 AI 风格建议生成
     void fetch("/api/generate-profile-advice", {
       method: "POST",
     });

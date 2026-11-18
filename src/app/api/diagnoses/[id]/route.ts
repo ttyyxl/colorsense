@@ -1,18 +1,35 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { deleteUserDiagnosis, getUserDiagnosis } from "@/lib/server/diagnoses";
 
-export function GET() {
-  return NextResponse.json(
-    { success: false, error: "This endpoint is deprecated. Diagnosis results are provided by Firestore." },
-    { status: 410 },
-  );
-}
+export const runtime = "nodejs";
 
 interface RouteContext {
   params: {
     id: string;
   };
+}
+
+export async function GET(_request: Request, { params }: RouteContext) {
+  const user = await verifyAuth();
+  if (!user) {
+    return NextResponse.json({ success: false, error: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  try {
+    const diagnosis = await getUserDiagnosis(params.id, user.uid);
+    if (!diagnosis) {
+      return NextResponse.json({ success: false, error: "NOT_FOUND" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, diagnosis });
+  } catch (error) {
+    console.error("[api/diagnoses/:id] load failed", {
+      diagnosisId: params.id,
+      userId: user.uid,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ success: false, error: "LOAD_FAILED" }, { status: 500 });
+  }
 }
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
@@ -24,41 +41,14 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  console.info("[diagnosis-delete] Delete request started", {
-    diagnosisId,
-    userId: user.uid,
-  });
-
   try {
-    const docRef = getAdminDb().collection("diagnoses").doc(diagnosisId);
-    const snapshot = await docRef.get();
-
-    if (!snapshot.exists) {
-      console.warn("[diagnosis-delete] Diagnosis not found", {
-        diagnosisId,
-        userId: user.uid,
-      });
+    const diagnosis = await getUserDiagnosis(diagnosisId, user.uid);
+    if (!diagnosis) {
       return NextResponse.json({ success: false, error: "Diagnosis not found" }, { status: 404 });
     }
 
-    const data = snapshot.data();
-    if (data?.userId !== user.uid) {
-      console.warn("[diagnosis-delete] Forbidden delete attempt", {
-        diagnosisId,
-        userId: user.uid,
-        ownerMatches: false,
-      });
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    // Current diagnosis records do not store uploaded images or subcollections.
-    // Deletion scope is therefore limited to the Firestore document itself.
-    await docRef.delete();
-
-    console.info("[diagnosis-delete] Delete request succeeded", {
-      diagnosisId,
-      userId: user.uid,
-    });
+    // 当前诊断记录不存储上传图片或子集合，删除范围仅限该行记录。
+    await deleteUserDiagnosis(diagnosisId, user.uid);
 
     return NextResponse.json({ success: true });
   } catch (error) {

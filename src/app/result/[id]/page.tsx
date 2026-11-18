@@ -8,7 +8,7 @@ import { SeasonCard } from "@/components/SeasonCard";
 import { AiAdviceSection } from "@/components/AiAdviceSection";
 import { DoubaoAdviceSection } from "@/components/DoubaoAdviceSection";
 import { ShareModal } from "@/components/ShareModal";
-import { getUserDiagnosis } from "@/lib/firestore-diagnoses";
+import { getUserDiagnosis } from "@/lib/client/diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
 import { useAuth } from "@/lib/useAuth";
@@ -50,7 +50,7 @@ export default function ResultPage({ params }: ResultPageProps) {
         return;
       }
       try {
-        const payload = await getUserDiagnosis(id, currentUser.uid);
+        const payload = await getUserDiagnosis(id);
 
         if (!payload) {
           throw new Error("没有找到这次诊断记录，或你无权查看该记录。");

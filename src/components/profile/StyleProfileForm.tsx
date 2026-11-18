@@ -1,11 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useState } from "react";
 import Sketch from "@uiw/react-color-sketch";
 import { hsvaToHslaString } from "@uiw/color-convert";
-import { auth } from "@/lib/firebase";
+import { getCloudBaseAuth } from "@/lib/cloudbase";
+import { getAuthToken } from "@/lib/client/api";
 import type { UserStyleProfile, UserStyleProfileInput } from "@/lib/user-profile-types";
 
 const GENDER_OPTIONS = ["女性", "男性", "非二元", "其他"];
@@ -185,6 +186,7 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
     let active = true;
 
     async function loadProfile() {
+      const auth = getCloudBaseAuth();
       if (!auth?.currentUser) {
         setLoading(false);
         return;
@@ -193,7 +195,7 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
       setAccountEmail(auth.currentUser.email ?? "已登录用户");
 
       try {
-        const token = await auth.currentUser.getIdToken();
+        const token = await getAuthToken();
         const response = await fetch("/api/user-profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -232,7 +234,7 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!auth?.currentUser) {
+    if (!getCloudBaseAuth()?.currentUser) {
       setNotice({ type: "error", text: "请先登录后再保存个人形象问卷。" });
       return;
     }
@@ -245,7 +247,7 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
     setSaving(true);
     setNotice(null);
     try {
-      const token = await auth.currentUser.getIdToken();
+      const token = await getAuthToken();
       const response = await fetch("/api/user-profile", {
         method: "PUT",
         headers: {

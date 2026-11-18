@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { SEASONS } from "@/lib/seasons";
 import type { SeasonType } from "@/lib/seasons";
 import { verifyAuth } from "@/lib/auth-server";
-import { getAdminDb } from "@/lib/firebase-admin";
 import { generateDoubaoStyleAdvice } from "@/lib/ai";
 import type { DiagnosisQuality } from "@/lib/types";
-import { getUserProfile } from "@/lib/firestore-user-profiles";
+import { createDiagnosis } from "@/lib/server/diagnoses";
+import { getUserProfile } from "@/lib/server/user-profiles";
 import { buildUserProfilePromptContext } from "@/lib/user-profile-summary";
 
 export const runtime = "nodejs";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "请先登录后再开始诊断。" }, { status: 401 });
   }
 
-  const canUseDiagnosisFeatures = user.email_verified === true || user.firebase?.sign_in_provider === "google.com";
+  const canUseDiagnosisFeatures = user.email_verified === true;
   if (!canUseDiagnosisFeatures) {
     return NextResponse.json({ success: false, error: "请先验证邮箱后再进行诊断。" }, { status: 403 });
   }
@@ -186,14 +186,11 @@ export async function POST(request: Request) {
     // 10. 保存到数据库
     let diagnosisId: string;
     try {
-      const docRef = await getAdminDb().collection("diagnoses").add({
+      diagnosisId = await createDiagnosis(user.uid, {
         ...requiredDiagnosisFields,
         ...(scores === undefined ? {} : { scores }),
-        doubaoAdvice,
-        userId: user.uid,
-        createdAt: new Date(),
+        ...(doubaoAdvice ? { doubaoAdvice } : {}),
       });
-      diagnosisId = docRef.id;
       console.info("[diagnose-debug] 保存成功", { diagnosisId });
     } catch (error) {
       console.error("[diagnose-debug] 保存失败:", error);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-server";
-import { createUserOutfitRecord, listUserOutfitRecords } from "@/lib/firestore-outfit-records";
+import { createUserOutfitRecord, listUserOutfitRecords } from "@/lib/server/outfit-records";
 import type { OutfitInspirationRequest, OutfitInspirationResult } from "@/lib/outfit-types";
 
 export const runtime = "nodejs";

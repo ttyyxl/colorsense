@@ -6,7 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { FooterGradient } from "@/components/home/FooterGradient";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ProfileSummary } from "@/components/profile/ProfileSummary";
-import { auth } from "@/lib/firebase";
+import { getAuthToken } from "@/lib/client/api";
 import { useAuth } from "@/lib/useAuth";
 import type { UserStyleProfile } from "@/lib/user-profile-types";
 
@@ -37,7 +37,8 @@ function PortraitProfileContent() {
     let active = true;
 
     async function loadProfile() {
-      if (!auth?.currentUser) {
+      const token = await getAuthToken();
+      if (!token) {
         setLoading(false);
         return;
       }
@@ -45,7 +46,6 @@ function PortraitProfileContent() {
       setLoading(true);
       setError("");
       try {
-        const token = await auth.currentUser.getIdToken();
         const [profileResponse, diagnosisResponse] = await Promise.all([
           fetch("/api/user-profile", {
             headers: { Authorization: `Bearer ${token}` },

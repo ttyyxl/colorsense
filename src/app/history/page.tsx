@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FooterGradient } from "@/components/home/FooterGradient";
-import { listUserDiagnoses } from "@/lib/firestore-diagnoses";
+import { listUserDiagnoses } from "@/lib/client/diagnoses";
+import { getAuthToken } from "@/lib/client/api";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
 import type { OutfitHistoryRecord, OutfitHistorySummary } from "@/lib/outfit-types";
@@ -418,9 +419,9 @@ export default function HistoryPage() {
     setDiagnosisLoading(true);
     setDiagnosisError("");
     try {
-      setDiagnoses(await listUserDiagnoses(currentUser.uid));
+      setDiagnoses(await listUserDiagnoses());
     } catch {
-      setDiagnosisError("历史诊断记录读取失败，请检查 Firestore 配置或稍后重试。");
+      setDiagnosisError("历史诊断记录读取失败，请检查网络或稍后重试。");
     } finally {
       setDiagnosisLoading(false);
     }
@@ -431,7 +432,7 @@ export default function HistoryPage() {
     setOutfitLoading(true);
     setOutfitError("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const response = await fetch("/api/outfit-records", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -475,7 +476,7 @@ export default function HistoryPage() {
 
     setOutfitError("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const response = await fetch(`/api/outfit-records/${encodeURIComponent(id)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -543,7 +544,7 @@ export default function HistoryPage() {
     setDiagnosisError("");
     setDiagnosisNotice("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const response = await fetch(`/api/diagnoses/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -573,7 +574,7 @@ export default function HistoryPage() {
     setDiagnosisError("");
     setDiagnosisNotice("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const response = await fetch("/api/diagnoses/batch-delete", {
         method: "POST",
         headers: {
@@ -687,7 +688,7 @@ export default function HistoryPage() {
     setOutfitError("");
     setOutfitNotice("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const response = await fetch(`/api/outfit-records/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -719,7 +720,7 @@ export default function HistoryPage() {
     const deletedIds: string[] = [];
     const failed: Array<{ id: string; reason: string }> = [];
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       for (const id of ids) {
         const response = await fetch(`/api/outfit-records/${encodeURIComponent(id)}`, {
           method: "DELETE",
@@ -764,7 +765,7 @@ export default function HistoryPage() {
     setOutfitError("");
     setOutfitNotice("");
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await getAuthToken();
       const fullRecords: OutfitHistoryRecord[] = [];
       for (let index = 0; index < selectedOutfits.length; index += 1) {
         const record = selectedOutfits[index];

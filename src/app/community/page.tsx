@@ -13,10 +13,10 @@ import {
   toggleCommunityPostLike,
   type CommunityComment,
   type CommunityPost,
-} from "@/lib/firestore-community-posts";
+} from "@/lib/client/community";
 import { useAuth } from "@/lib/useAuth";
 import { Heart, MessageCircle, Plus, Send, Share2, Sparkles } from "lucide-react";
-import type { User } from "firebase/auth";
+import type { AppUser } from "@/lib/auth-client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 const HOT_TAGS = [
@@ -51,19 +51,6 @@ export default function CommunityPage() {
 
   const userEmail = currentUser?.email?.trim() ?? "";
   const userName = useMemo(() => getCommunityUserName(userEmail), [userEmail]);
-
-  useEffect(() => {
-    console.log("===调试社区模块开始===");
-    console.log("[社区调试] currentUser:", currentUser);
-    console.log("[社区调试] auth state:", {
-      isAuthenticated,
-      authLoading,
-      uid: currentUser?.uid,
-      email: currentUser?.email,
-      emailVerified: currentUser?.emailVerified,
-      providerData: currentUser?.providerData,
-    });
-  }, [authLoading, currentUser, isAuthenticated]);
 
   useEffect(() => {
     setLoadingPosts(true);
@@ -108,16 +95,6 @@ export default function CommunityPage() {
 
     setSubmitting(true);
     try {
-      console.log("[社区调试] currentUser:", currentUser);
-      console.log("[社区调试] uid:", currentUser?.uid);
-      console.log("[社区调试] email:", currentUser?.email);
-      console.log("[社区调试] 准备发布动态:", {
-        uid: currentUser.uid,
-        email: currentUser.email,
-        generatedUserName: userName,
-        content: trimmedContent,
-      });
-
       await createCommunityPost({
         uid: currentUser.uid,
         userEmail,
@@ -130,11 +107,7 @@ export default function CommunityPage() {
       setCustomTag("");
       setNotice("发布成功");
     } catch (error) {
-      console.error("[社区调试] 发布动态捕获异常:", error);
       const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("PERMISSION_DENIED") || message.includes("permission-denied")) {
-        console.error("[社区调试] 请确认 Firestore rules 允许登录用户读取和创建 community_posts。");
-      }
       setError(`发布失败，请稍后重试${message ? `：${message}` : ""}`);
     } finally {
       setSubmitting(false);
@@ -355,7 +328,7 @@ function CommunityPostCard({
   onNotice,
 }: {
   post: CommunityPost;
-  currentUser: User | null;
+  currentUser: AppUser | null;
   isAuthenticated: boolean;
   userName: string;
   onError: (message: string) => void;
@@ -437,7 +410,6 @@ function CommunityPostCard({
         userEmail: currentUser.email ?? "",
       });
     } catch (error) {
-      console.error("[社区调试] 点赞操作失败完整错误:", error);
       const message = error instanceof Error ? error.message : String(error);
       onError(`点赞失败，请稍后重试${message ? `：${message}` : ""}`);
     } finally {
@@ -469,7 +441,6 @@ function CommunityPostCard({
       });
       setCommentContent("");
     } catch (error) {
-      console.error("[社区调试] 评论发送失败完整错误:", error);
       const message = error instanceof Error ? error.message : String(error);
       onError(`评论发送失败，请稍后重试${message ? `：${message}` : ""}`);
     } finally {
@@ -494,7 +465,6 @@ function CommunityPostCard({
       await navigator.clipboard.writeText(shareUrl);
       onNotice("链接已复制，可以分享给朋友了");
     } catch (error) {
-      console.error("[社区调试] 分享失败完整错误:", error);
       const message = error instanceof Error ? error.message : String(error);
       onError(`分享失败，请稍后重试${message ? `：${message}` : ""}`);
     }
