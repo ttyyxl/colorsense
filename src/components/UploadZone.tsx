@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { getAuthToken } from "@/lib/client/api";
+import { fileToCompressedDataUrl, saveUploadedImage } from "@/lib/client/uploaded-image";
 import type { ApiResponse, NewDiagnosis } from "@/lib/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -220,6 +221,12 @@ export function UploadZone() {
 
       if (!payload.diagnosisId) {
         throw new Error("Diagnosis completed, but no result ID was returned. Please try again.");
+      }
+
+      // 暂存（压缩后的）原图，供结果页图生图使用；失败时自动回退为纯文生图。
+      const referenceImage = await fileToCompressedDataUrl(file);
+      if (referenceImage) {
+        saveUploadedImage(payload.diagnosisId, referenceImage);
       }
 
       console.info("[diagnose-debug] Router navigation", {

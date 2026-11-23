@@ -8,6 +8,7 @@ import { SeasonCard } from "@/components/SeasonCard";
 import { AiAdviceSection } from "@/components/AiAdviceSection";
 import { DoubaoAdviceSection } from "@/components/DoubaoAdviceSection";
 import { ShareModal } from "@/components/ShareModal";
+import { StyleImageCard } from "@/components/StyleImageCard";
 import { getUserDiagnosis } from "@/lib/client/diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
@@ -155,6 +156,7 @@ export default function ResultPage({ params }: ResultPageProps) {
                       <ColorPalette colors={diagnosis.colorPalette} />
                     </div>
                   </section>
+                  <StyleImageCard diagnosis={diagnosis} />
                   <section className="glass-card rounded-[20px] p-6">
                     <h2 className="text-xl font-bold text-[#181698]">风格建议</h2>
                     <p className="mt-4 leading-8 text-[#667694]">{diagnosis.aiDescription}</p>
