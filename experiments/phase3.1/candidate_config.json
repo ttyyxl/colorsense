@@ -1,0 +1,85 @@
+{
+  "name": "phase3.2-candidate",
+  "status": "candidate-not-enabled",
+  "note": "Phase 3.2 离线实验产出的代表性候选参数。**尚未启用**：现有数据不足以证明其优于生产默认值，故生产仍使用 diagnosis-config.ts 中的原值。切换只需改 diagnosis-config.ts 对应常量。",
+  "baseline": {
+    "cnnWeight": 0.4,
+    "doubaoWeight": 0.6,
+    "uncertainty": {
+      "minTopScore": 0.5,
+      "minTopGap": 0.1,
+      "totalVariationDistance": 0.4,
+      "minModelTopGap": 0.08
+    },
+    "imageQuality": {
+      "channelCastWarning": 0.11,
+      "channelCastHigh": 0.2,
+      "channelCastSevere": 0.3
+    }
+  },
+  "candidates": {
+    "cnnWeight": {
+      "value": 0.5,
+      "status": "rejected",
+      "evidence": "共同样本 n=66：50:50 纯分类 29/66 (0.4394) vs 40:60 28/66 (0.4242)，仅差 1 个样本；综合诊断口径正确正式诊断同为 8，错误正式诊断 11→13。无足够证据变更生产权重。"
+    },
+    "minTopScore": {
+      "value": 0.4,
+      "status": "rejected",
+      "evidence": "96 张重放：覆盖率 19.79%→26.04%，但错误正式诊断 11→16（错误正式诊断率 11.46%→16.67%），已接受准确率 8/19→9/25 不升反降。放宽阈值换来的是更多错误正式诊断，故不采用。"
+    },
+    "minTopGap": {
+      "value": 0.1,
+      "status": "kept-as-production",
+      "evidence": "扫描 0.05/0.08/0.10/0.12/0.15 在本批样本上结果完全一致，参数无区分度，保持原值。"
+    },
+    "totalVariationDistance": {
+      "value": 0.4,
+      "status": "kept-as-production",
+      "evidence": "收紧到 0.35 使覆盖率 19.79%→16.67%、已接受准确率 42.1%→37.5%；放宽到 0.45 使错误正式诊断 11→15。0.40 为当前折中点。"
+    },
+    "minModelTopGap": {
+      "value": 0.08,
+      "status": "kept-as-production",
+      "evidence": "扫描 0.05/0.08/0.10 结果一致；0.12 仅使覆盖率下降 1 个样本，无收益。"
+    },
+    "channelCastWarning": {
+      "value": 0.11,
+      "status": "kept-as-production",
+      "evidence": "候选 0.15/0.18 对 96 张重放的状态结果完全无影响（该级别为 info 级提示，不参与状态判定），无变更依据。"
+    },
+    "channelCastHigh": {
+      "value": 0.2,
+      "status": "kept-as-production",
+      "evidence": "候选 0.25 对 96 张重放的状态结果完全无影响，该级别现为软警告。"
+    },
+    "channelCastSevere": {
+      "value": 0.3,
+      "status": "enabled-in-production",
+      "evidence": "Phase 3.2 新增的决定性风险阈值：768 张受控样本中强色彩处理变体 63/64 命中，原始样本仅 3/64 命中。用于阻止颜色信息不可靠的照片输出正式季型（Phase 3.1 中 winter__766__strong_filter / winter__3738__strong_filter 两模型同错却判 CONFIDENT）。",
+      "scan": {
+        "0.25": { "formalCount": 16, "correctFormal": 6, "wrongFormal": 10, "originalCoverage": "3/8", "originalBlockedByColor": "1/8", "originalFlagRate768": "5/64", "strongFilterDetected768": "64/64" },
+        "0.3": { "formalCount": 19, "correctFormal": 8, "wrongFormal": 11, "originalCoverage": "3/8", "originalBlockedByColor": "1/8", "originalFlagRate768": "3/64", "strongFilterDetected768": "63/64" },
+        "0.35": { "formalCount": 21, "correctFormal": 10, "wrongFormal": 11, "originalCoverage": "4/8", "originalBlockedByColor": "0/8", "originalFlagRate768": "2/64", "strongFilterDetected768": "62/64" },
+        "0.4": { "formalCount": 23, "correctFormal": 12, "wrongFormal": 11, "originalCoverage": "5/8", "originalBlockedByColor": "0/8", "originalFlagRate768": "1/64", "strongFilterDetected768": "62/64" }
+      },
+      "decisionRationale": "选择 0.30 而非开发集指标更优的 0.35/0.40，理由：(1) 该指标语义为「颜色分布异常风险」而非滤镜识别，0.30 对应原图样本的第 97 百分位，对分布明显失衡的照片判 UNCERTAIN 符合设计意图；(2) 0.30 的强色彩变体检出率最高（63/64）；(3) 0.35 相对 0.30 的收益全部来自单一原图 spring__3244（96 张非独立开发集中 8 张原图的 1 张），属于对个别 ID 的调参，任务明确禁止；(4) 保持保守口径，避免以放宽阈值换取覆盖率。",
+      "lockedIndependentValidation": {
+        "set": "CNN test 22 张原图 + 全部同源变体 = 264 张（第一轮未使用）",
+        "paidApiCalls": 0,
+        "originalsFlagged": "1/22 = 4.55%（开发集 3/64 = 4.69%，一致）",
+        "strongFilterDetected": "21/22 = 95.45%（开发集 63/64 = 98.44%，同量级）",
+        "conclusion": "阈值在未参与任何开发的数据上表现一致，无过拟合迹象；剩余问题仅为是否偏保守，需更大独立样本判定。"
+      }
+    },
+    "riskPolicy": {
+      "value": { "mode": "layered", "softWarningGroupsToEscalate": 2 },
+      "status": "enabled-in-production",
+      "evidence": "Phase 3.2 机制修复：软警告单独不再触发 UNCERTAIN；仅当图像侧与模型侧软警告同时命中才升级为 MULTIPLE_INDEPENDENT_RISKS。legacy 模式保留用于复现 Phase 3.1 结论。"
+    }
+  },
+  "dynamicWeight": {
+    "status": "not-enabled",
+    "note": "applicability 与 reliability 保持中性值 1。当前样本量小且数据集与 CNN 训练集高度交叉，无独立证据支持非中性系数。"
+  }
+}

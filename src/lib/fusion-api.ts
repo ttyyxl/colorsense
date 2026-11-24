@@ -1,0 +1,165 @@
+import type { SeasonType } from "./seasons.ts";
+import {
+  buildFusionDiagnosis,
+  DEFAULT_CNN_WEIGHT,
+  type CnnFusionInput,
+  type DoubaoFusionInput,
+  type FusionDiagnosis,
+  type FusionUnavailableCode,
+} from "./fusion.ts";
+import type { SeasonKey, SeasonScores } from "./vision-schema.ts";
+import { logVisionDiagnostics } from "./vision-diagnostics.ts";
+import {
+  buildAdvancedDiagnosis,
+  type AdvancedDiagnosisInput,
+} from "./advanced-diagnosis.ts";
+import type { AdvancedFusionDiagnosis, DiagnosisRiskEntry } from "./diagnosis-types.ts";
+
+/**
+ * /api/diagnose 与综合结果之间的纯适配层。
+ * 路由和测试共用这里的组装逻辑，保证接口返回值与 PostgreSQL 记录来自同一个结果对象。
+ */
+
+export interface LegacySeasonFields {
+  seasonType: SeasonKey;
+  confidence: number;
+  scores?: Partial<Record<SeasonType, number>>;
+}
+
+export interface AssembleDiagnosisInput {
+  fusionEnabled: boolean;
+  cnnWeight?: number;
+  cnn: CnnFusionInput | null;
+  doubao: DoubaoFusionInput | null;
+  cnnCode?: FusionUnavailableCode;
+  doubaoCode?: FusionUnavailableCode;
+  legacy: LegacySeasonFields;
+}
+
+export interface AssembledDiagnosisFields {
+  seasonType: SeasonKey;
+  confidence: number;
+  scores?: Partial<Record<SeasonType, number>> | SeasonScores;
+  fusionDiagnosis?: FusionDiagnosis;
+}
+
+/**
+ * FUSION_ENABLED=false 时逐字段保留第一阶段行为。
+ * 启用后顶层 seasonType / confidence / scores 全部取自综合结果，避免与新字段矛盾。
+ * 此时 confidence 的含义是「top-1 融合分数」，不是经过概率校准的置信度。
+ */
+export function assembleDiagnosisFields(input: AssembleDiagnosisInput): AssembledDiagnosisFields {
+  if (!input.fusionEnabled) {
+    return {
+      seasonType: input.legacy.seasonType,
+      confidence: input.legacy.confidence,
+      ...(input.legacy.scores === undefined ? {} : { scores: input.legacy.scores }),
+    };
+  }
+
+  const fusionDiagnosis = buildFusionDiagnosis({
+    cnn: input.cnn,
+    doubao: input.doubao,
+    cnnWeight: input.cnnWeight,
+    cnnCode: input.cnnCode,
+    doubaoCode: input.doubaoCode,
+  });
+
+  // 只记录机器可读的结果来源与原因码；不记录季型分数、用户画像或任何自然语言内容。
+  logVisionDiagnostics("fusion.result", {
+    fusionEnabled: true,
+    cnnWeight: fusionDiagnosis.requestedWeights.cnn,
+    source: fusionDiagnosis.source,
+    fallbackReason: fusionDiagnosis.fallbackReason,
+  });
+
+  return {
+    seasonType: fusionDiagnosis.predictedSeason,
+    confidence: fusionDiagnosis.seasonScores[fusionDiagnosis.predictedSeason],
+    scores: fusionDiagnosis.seasonScores,
+    fusionDiagnosis,
+  };
+}
+
+export interface AssembleAdvancedInput extends AdvancedDiagnosisInput {
+  /** 预留开关一致性；v2 组装本身只在融合启用时由调用方触发。 */
+  fusionEnabled: boolean;
+  /** 旧字段兜底：仅 fusion 不可用时（RETAKE/FAILED）不会写入。 */
+  legacy: LegacySeasonFields;
+}
+
+export interface AssembledAdvancedFields {
+  /** blocked 时不存在任何正式季型字段，前端不得展示确定性结论。 */
+  blocked: boolean;
+  /**
+   * Phase 3.3：是否存在合法有效的季型结果。
+   * CONFIDENT / UNCERTAIN / DEGRADED 均为 true（允许展示与生成后续建议）；
+   * RETAKE_REQUIRED / FAILED 为 false。
+   */
+  hasValidSeasonResult: boolean;
+  diagnosisStatus: AdvancedFusionDiagnosis["diagnosisStatus"];
+  inferenceMode: AdvancedFusionDiagnosis["inferenceMode"];
+  uncertaintyReasons: string[];
+  /** 风险分层明细（Phase 3.2）。 */
+  risks: DiagnosisRiskEntry[];
+  /** 决定性风险原因。 */
+  decisiveReasons: string[];
+  /** 仅软警告（不阻止正式诊断，但仍需展示）。 */
+  softWarnings: string[];
+  recommendations: string[];
+  seasonType?: SeasonKey;
+  confidence?: number;
+  scores?: SeasonScores;
+  fusionDiagnosis?: AdvancedFusionDiagnosis;
+}
+
+/**
+ * 第三阶段 v2 适配：v1 顶层字段在可诊断时与融合结果同源；
+ * RETAKE_REQUIRED / FAILED 时不产生 seasonType/confidence/scores，杜绝虚假结论。
+ *
+ * Phase 3.3：顶层 seasonType / confidence / scores 始终取自最终融合结果
+ * （fusionDiagnosis.predictedSeason / seasonScores），不引入任何额外抬高；
+ * confidence 恒等于 scores[seasonType]，保证两处口径完全一致。
+ */
+export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): AssembledAdvancedFields {
+  const result = buildAdvancedDiagnosis(input);
+  logVisionDiagnostics("fusion.result", {
+    fusionEnabled: true,
+    cnnWeight: input.cnnWeight ?? DEFAULT_CNN_WEIGHT,
+    source: result.fusion?.source,
+    fallbackReason: result.fusion?.fallbackReason ?? result.blockedCode ?? null,
+  });
+
+  if (!result.fusion) {
+    return {
+      blocked: true,
+      hasValidSeasonResult: false,
+      diagnosisStatus: result.diagnosisStatus,
+      inferenceMode: result.inferenceMode,
+      uncertaintyReasons: result.uncertaintyReasons,
+      risks: result.risks,
+      decisiveReasons: result.decisiveReasons,
+      softWarnings: result.softWarnings,
+      recommendations: result.recommendations,
+    };
+  }
+
+  const fusion = result.fusion;
+  return {
+    blocked: false,
+    // Phase 3.3：低可信度（UNCERTAIN / DEGRADED）同样拥有有效季型结果，可继续执行业务。
+    hasValidSeasonResult: result.hasValidSeasonResult,
+    diagnosisStatus: result.diagnosisStatus,
+    inferenceMode: result.inferenceMode,
+    uncertaintyReasons: result.uncertaintyReasons,
+    risks: result.risks,
+    decisiveReasons: result.decisiveReasons,
+    softWarnings: result.softWarnings,
+    recommendations: result.recommendations,
+    // 顶层字段与 fusionDiagnosis 严格同源：同源季型、同源分数、同源置信度。
+    seasonType: fusion.predictedSeason,
+    confidence: fusion.seasonScores[fusion.predictedSeason],
+    scores: fusion.seasonScores,
+    fusionDiagnosis: fusion,
+  };
+}

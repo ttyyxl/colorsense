@@ -12,6 +12,13 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 const NO_CLEAR_FACE_MESSAGE = "未检测到清晰人脸，请在自然光下重新上传或拍摄正面人像照片。";
 const MODEL_UNAVAILABLE_MESSAGE = "模型服务暂时不可用，请稍后重试。";
+const DEFAULT_RETAKE_RECOMMENDATIONS = [
+  "请上传真人正脸照片，保持脸部正对镜头",
+  "避免遮挡、墨镜、口罩",
+  "避免强逆光或过暗环境",
+  "尽量使用自然光",
+  "请勿上传动物、卡通、风景、物体或多人合照",
+];
 
 export function UploadZone() {
   const router = useRouter();
@@ -23,6 +30,7 @@ export function UploadZone() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [noClearFace, setNoClearFace] = useState(false);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -179,6 +187,8 @@ export function UploadZone() {
 
     setIsSubmitting(true);
     setError("");
+    setNoClearFace(false);
+    setRecommendations([]);
 
     try {
       const formData = new FormData();
@@ -216,7 +226,24 @@ export function UploadZone() {
         if (!payload.success && payload.error === "MODEL_UNAVAILABLE") {
           throw new Error(payload.message ?? MODEL_UNAVAILABLE_MESSAGE);
         }
+        if (!payload.success && payload.error === "DIAGNOSIS_FAILED") {
+          setNoClearFace(true);
+          setRecommendations(payload.recommendations ?? []);
+          throw new Error(payload.message ?? "暂时无法完成诊断，请按照建议调整后重试。");
+        }
         throw new Error(payload.success ? "诊断失败，请稍后重试。" : payload.error);
+      }
+
+      if ("blocked" in payload && payload.blocked) {
+        resetSelectedImage();
+        setNoClearFace(true);
+        setRecommendations(payload.recommendations ?? []);
+        setError(
+          payload.diagnosisStatus === "FAILED"
+            ? "暂时无法完成诊断，请按照建议调整后重试。"
+            : NO_CLEAR_FACE_MESSAGE,
+        );
+        return;
       }
 
       if (!payload.diagnosisId) {
@@ -345,11 +372,9 @@ export function UploadZone() {
         <div className="glass-card rounded-[20px] px-4 py-3 text-sm text-amber-800 border border-amber-300"> {/* Apply glass-card and amber color scheme */}
           <p className="font-semibold">重新拍摄建议</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-[#667694]"> {/* Change text color */}
-            <li>请上传真人正脸照片，保持脸部正对镜头</li>
-            <li>避免遮挡、墨镜、口罩</li>
-            <li>避免强逆光或过暗环境</li>
-            <li>尽量使用自然光</li>
-            <li>请勿上传动物、卡通、风景、物体或多人合照</li>
+            {(recommendations.length > 0 ? recommendations : DEFAULT_RETAKE_RECOMMENDATIONS).map((recommendation) => (
+              <li key={recommendation}>{recommendation}</li>
+            ))}
           </ul>
         </div>
       )}

@@ -1,14 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readUploadedImage } from "@/lib/client/uploaded-image";
+import { apiFetch } from "@/lib/client/api";
+import { presentationForStatus } from "@/lib/diagnosis-status-ui";
+import { isExecutableDiagnosisStatus, resolveDiagnosisStatusOf } from "@/lib/diagnosis-status";
+import { useAuth } from "@/lib/useAuth";
 import type { Diagnosis } from "@/lib/types";
+
+/**
+ * 个人形象分析图卡。
+ *
+ * 与远程实现的差异（均为本次任务的强制要求）：
+ * 1. 进入结果页不会自动发起付费生图：挂载时只读取本地缓存，生成必须由用户点击触发。
+ * 2. 请求携带 CloudBase access token，复用项目现有鉴权方式。
+ * 3. 发送参考照片前必须由用户显式勾选同意第三方处理。
+ * 4. Phase 3.3：只要存在有效季型结果即可生成（含 UNCERTAIN / DEGRADED）；
+ *    仅硬阻断状态（RETAKE_REQUIRED / FAILED）不允许，服务端会再次校验。
+ * 5. 缓存失效时只提示用户手动重新生成，不会自动重发付费请求。
+ */
 
 interface StyleImageCardProps {
   diagnosis: Diagnosis;
 }
 
 const CACHE_PREFIX = "colorsense:style-image:";
+const CONSENT_PREFIX = "colorsense:style-image-consent:";
 
 interface CachedImage {
   url: string;
@@ -17,92 +34,164 @@ interface CachedImage {
   savedAt: number;
 }
 
-function readCache(diagnosisId: string, colors: string[], usedReference: boolean): string | null {
+function readCache(diagnosisId: string): CachedImage | null {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + diagnosisId);
+    const raw = window.sessionStorage.getItem(CACHE_PREFIX + diagnosisId);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedImage;
-    if (
-      parsed &&
-      parsed.url &&
-      parsed.usedReference === usedReference &&
-      Array.isArray(parsed.colors) &&
-      parsed.colors.length === colors.length &&
-      parsed.colors.every((c, i) => c === colors[i])
-    ) {
-      return parsed.url;
+    if (!parsed || typeof parsed.url !== "string" || !Array.isArray(parsed.colors)) {
+      return null;
     }
+    return parsed;
   } catch {
-    /* ignore */
+    return null;
   }
-  return null;
 }
 
 function writeCache(diagnosisId: string, colors: string[], url: string, usedReference: boolean) {
   try {
     const payload: CachedImage = { url, colors, usedReference, savedAt: Date.now() };
-    localStorage.setItem(CACHE_PREFIX + diagnosisId, JSON.stringify(payload));
+    window.sessionStorage.setItem(CACHE_PREFIX + diagnosisId, JSON.stringify(payload));
+  } catch {
+    /* 缓存写入失败不影响主流程 */
+  }
+}
+
+function hasConsented(diagnosisId: string): boolean {
+  try {
+    return window.sessionStorage.getItem(CONSENT_PREFIX + diagnosisId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberConsent(diagnosisId: string) {
+  try {
+    window.sessionStorage.setItem(CONSENT_PREFIX + diagnosisId, "1");
   } catch {
     /* ignore */
   }
 }
 
+function sameColors(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((color, index) => color === right[index]);
+}
+
 export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
+  const { currentUser } = useAuth();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasReference, setHasReference] = useState(false);
+  const [consented, setConsented] = useState(false);
+  const [cacheInvalid, setCacheInvalid] = useState(false);
+  const inFlight = useRef(false);
 
+  // 数据来源统一取自最终诊断结果（融合后的色卡与季型），不使用单独的 CNN 分类结果。
   const colors = diagnosis.colorPalette.slice(0, 6);
+  const status = resolveDiagnosisStatusOf(diagnosis);
+  const presentation = presentationForStatus(status);
+  // Phase 3.3：诊断可信程度与业务可执行性解耦——UNCERTAIN / DEGRADED 同样允许生成。
+  const canGenerate = presentation.showFormalSeason && isExecutableDiagnosisStatus(status);
 
+  // 挂载时只读取缓存，不发起任何付费请求。
   useEffect(() => {
     setHasReference(Boolean(readUploadedImage(diagnosis.id)));
-  }, [diagnosis.id]);
+    setConsented(hasConsented(diagnosis.id));
 
-  async function generate(useCache = true) {
-    setLoading(true);
-    setError(null);
-
-    const referenceImage = readUploadedImage(diagnosis.id);
-
-    if (useCache) {
-      const cached = readCache(diagnosis.id, colors, Boolean(referenceImage));
-      if (cached) {
-        setImageUrl(cached);
-        setLoading(false);
-        return;
-      }
-    }
-
-    try {
-      const resp = await fetch("/api/generate-style-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          colors,
-          season: diagnosis.seasonType,
-          labFeatures: diagnosis.labFeatures,
-          ...(referenceImage ? { image: referenceImage } : {}),
-        }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data?.success || !data?.url) {
-        throw new Error(data?.error || "图片生成失败");
-      }
-      setImageUrl(data.url);
-      writeCache(diagnosis.id, colors, data.url, Boolean(referenceImage));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "图片生成失败");
+    const cached = readCache(diagnosis.id);
+    if (!cached) {
       setImageUrl(null);
-    } finally {
-      setLoading(false);
+      setCacheInvalid(false);
+      return;
     }
-  }
-
-  useEffect(() => {
-    void generate(true);
+    const reference = Boolean(readUploadedImage(diagnosis.id));
+    if (sameColors(cached.colors, colors) && cached.usedReference === reference) {
+      setImageUrl(cached.url);
+      setCacheInvalid(false);
+    } else {
+      // 缓存与当前诊断不匹配：只提示用户手动重新生成，不自动重发请求。
+      setImageUrl(null);
+      setCacheInvalid(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagnosis.id]);
+
+  const generate = useCallback(
+    async (options: { force: boolean }) => {
+      if (inFlight.current || !canGenerate) {
+        return;
+      }
+
+      const referenceImage = readUploadedImage(diagnosis.id);
+      if (referenceImage && !consented) {
+        setError("请先确认第三方照片处理说明，再生成图卡。");
+        return;
+      }
+
+      if (!options.force) {
+        const cached = readCache(diagnosis.id);
+        if (cached && sameColors(cached.colors, colors) && cached.usedReference === Boolean(referenceImage)) {
+          setImageUrl(cached.url);
+          setCacheInvalid(false);
+          setError(null);
+          return;
+        }
+      }
+
+      inFlight.current = true;
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (!currentUser) {
+          throw new Error("登录已过期，请重新登录后再试。");
+        }
+        const resp = await apiFetch("/api/generate-style-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            diagnosisId: diagnosis.id,
+            ...(referenceImage ? { image: referenceImage } : {}),
+          }),
+        });
+
+        const data = (await resp.json().catch(() => null)) as
+          | { success?: boolean; url?: string; error?: string }
+          | null;
+
+        if (!resp.ok || !data?.success || !data.url) {
+          throw new Error(data?.error || "图片生成失败，请稍后重试。");
+        }
+
+        setImageUrl(data.url);
+        setCacheInvalid(false);
+        writeCache(diagnosis.id, colors, data.url, Boolean(referenceImage));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "图片生成失败，请稍后重试。");
+        setImageUrl(null);
+      } finally {
+        inFlight.current = false;
+        setLoading(false);
+      }
+    },
+    [canGenerate, colors, consented, currentUser, diagnosis.id],
+  );
+
+  if (!canGenerate) {
+    return (
+      <section className="glass-card rounded-[20px] p-6">
+        <h2 className="text-xl font-bold text-[#181698]">个人形象分析图卡</h2>
+        <p className="mt-2 text-sm leading-6 text-[#667694]">
+          本次诊断状态为「{status}」，未产出有效季型结果，因此不生成推荐图卡。
+        </p>
+      </section>
+    );
+  }
+
+  const needsConsent = hasReference && !consented;
 
   return (
     <section className="glass-card rounded-[20px] p-6">
@@ -117,13 +206,38 @@ export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
         </div>
         <button
           type="button"
-          onClick={() => generate(false)}
-          disabled={loading}
+          onClick={() => void generate({ force: imageUrl !== null })}
+          disabled={loading || needsConsent}
           className="shrink-0 rounded-xl bg-[#181698] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2a28b8] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "生成中..." : imageUrl ? "重新生成" : "生成图卡"}
         </button>
       </div>
+
+      {hasReference && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">第三方照片处理说明</p>
+          <p className="mt-2 leading-6">
+            生成图卡时，你上传的原始照片将被发送至第三方 AI 服务（火山方舟 / 豆包）用于图生图处理。
+            照片只用于本次生成，不会在本项目数据库中保存；参考图仅暂存在当前浏览器，可通过清除站点数据删除。
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={consented}
+              onChange={(event) => {
+                const next = event.target.checked;
+                setConsented(next);
+                if (next) {
+                  rememberConsent(diagnosis.id);
+                }
+              }}
+            />
+            <span>我已了解并同意将照片发送至第三方服务用于图生图处理</span>
+          </label>
+        </div>
+      )}
 
       <div className="mt-5">
         {loading && !imageUrl && (
@@ -137,7 +251,7 @@ export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
             生成失败：{error}
             <button
               type="button"
-              onClick={() => generate(false)}
+              onClick={() => void generate({ force: true })}
               className="ml-3 underline underline-offset-2 hover:text-red-900"
             >
               重试
@@ -147,6 +261,7 @@ export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
 
         {imageUrl && (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
               alt="个人形象分析图卡"
@@ -161,7 +276,7 @@ export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
 
         {!loading && !imageUrl && !error && (
           <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-[#667694]">
-            点击「生成图卡」查看效果
+            {cacheInvalid ? "缓存已失效，请点击「生成图卡」重新生成" : "点击「生成图卡」查看效果"}
           </div>
         )}
       </div>

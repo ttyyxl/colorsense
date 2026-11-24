@@ -5,7 +5,7 @@ import { byId, byUser, pgDelete, pgInsert, pgSelect, pgSelectOne, type Filter } 
 
 const TABLE = "cs_diagnoses";
 
-interface DiagnosisRow {
+export interface DiagnosisRow {
   id: string;
   user_id: string;
   season_type: string;
@@ -22,10 +22,19 @@ interface DiagnosisRow {
   face_confidence: number | null;
   ai_advice: AiAdvice | null;
   doubao_advice: DoubaoStyleAdvice | null;
+  fusion_diagnosis: Diagnosis["fusionDiagnosis"] | null;
+  diagnosis_status: Diagnosis["diagnosisStatus"] | null;
+  inference_mode: Diagnosis["inferenceMode"] | null;
+  uncertainty_reasons: string[] | null;
+  risks: Diagnosis["risks"] | null;
+  decisive_reasons: string[] | null;
+  soft_warnings: string[] | null;
+  recommendations: string[] | null;
+  has_valid_season_result: boolean | null;
   created_at: string;
 }
 
-function toDiagnosis(row: DiagnosisRow): Diagnosis {
+export function toDiagnosis(row: DiagnosisRow): Diagnosis {
   return {
     id: row.id,
     userId: row.user_id,
@@ -44,29 +53,53 @@ function toDiagnosis(row: DiagnosisRow): Diagnosis {
     ...(row.face_confidence === null ? {} : { faceConfidence: row.face_confidence }),
     ...(row.ai_advice ? { aiAdvice: row.ai_advice } : {}),
     ...(row.doubao_advice ? { doubaoAdvice: row.doubao_advice } : {}),
+    ...(row.fusion_diagnosis ? { fusionDiagnosis: row.fusion_diagnosis } : {}),
+    ...(row.diagnosis_status ? { diagnosisStatus: row.diagnosis_status } : {}),
+    ...(row.inference_mode ? { inferenceMode: row.inference_mode } : {}),
+    ...(row.uncertainty_reasons ? { uncertaintyReasons: row.uncertainty_reasons } : {}),
+    ...(row.risks ? { risks: row.risks } : {}),
+    ...(row.decisive_reasons ? { decisiveReasons: row.decisive_reasons } : {}),
+    ...(row.soft_warnings ? { softWarnings: row.soft_warnings } : {}),
+    ...(row.recommendations ? { recommendations: row.recommendations } : {}),
+    ...(typeof row.has_valid_season_result === "boolean"
+      ? { hasValidSeasonResult: row.has_valid_season_result }
+      : {}),
+  };
+}
+
+export function buildDiagnosisInsert(userId: string, input: NewDiagnosis) {
+  return {
+    user_id: userId,
+    season_type: input.seasonType,
+    confidence: input.confidence,
+    color_palette: input.colorPalette ?? [],
+    style_keywords: input.styleKeywords ?? [],
+    avoid_colors: input.avoidColors ?? [],
+    ai_description: input.aiDescription ?? "",
+    lab_features: input.labFeatures ?? null,
+    source: input.source,
+    scores: input.scores ?? null,
+    face_detected: input.faceDetected ?? null,
+    used_original_image: input.usedOriginalImage ?? null,
+    face_confidence: input.faceConfidence ?? null,
+    ai_advice: input.aiAdvice ?? null,
+    doubao_advice: input.doubaoAdvice ?? null,
+    fusion_diagnosis: input.fusionDiagnosis ?? null,
+    diagnosis_status: input.diagnosisStatus ?? null,
+    inference_mode: input.inferenceMode ?? null,
+    uncertainty_reasons: input.uncertaintyReasons ?? null,
+    risks: input.risks ?? null,
+    decisive_reasons: input.decisiveReasons ?? null,
+    soft_warnings: input.softWarnings ?? null,
+    recommendations: input.recommendations ?? null,
+    has_valid_season_result: input.hasValidSeasonResult ?? null,
   };
 }
 
 export async function createDiagnosis(userId: string, input: NewDiagnosis): Promise<string> {
   const rows = await pgInsert<{ id: string }>(
     TABLE,
-    {
-      user_id: userId,
-      season_type: input.seasonType,
-      confidence: input.confidence,
-      color_palette: input.colorPalette ?? [],
-      style_keywords: input.styleKeywords ?? [],
-      avoid_colors: input.avoidColors ?? [],
-      ai_description: input.aiDescription ?? "",
-      lab_features: input.labFeatures ?? null,
-      source: input.source,
-      scores: input.scores ?? null,
-      face_detected: input.faceDetected ?? null,
-      used_original_image: input.usedOriginalImage ?? null,
-      face_confidence: input.faceConfidence ?? null,
-      ai_advice: input.aiAdvice ?? null,
-      doubao_advice: input.doubaoAdvice ?? null,
-    },
+    buildDiagnosisInsert(userId, input),
     { select: "id" },
   );
 

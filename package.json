@@ -2,11 +2,21 @@
   "name": "colorsense",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:vision": "node --import tsx ./scripts/test-doubao-vision.ts",
+    "test:vision:unit": "node --import tsx --test tests/vision-schema.test.ts tests/doubao-vision.test.ts",
+    "test:fusion:unit": "node --import tsx --test tests/fusion.test.ts tests/fusion-diagnose.test.ts",
+    "test:vision:orientation": "node --import tsx --test tests/doubao-orientation.test.ts",
+    "test:diagnostics:unit": "node --import tsx --test tests/vision-diagnostics.test.ts",
+    "test:advanced:unit": "node --import tsx --test tests/advanced-diagnosis.test.ts tests/diagnose-flow.test.ts tests/diagnosis-status-ui.test.ts tests/phase3.3-decision.test.ts",
+    "test:style-image:unit": "node --import tsx --test tests/generate-style-image.test.ts tests/uploaded-image.test.ts",
+    "test:offline": "node --import tsx --test tests/vision-schema.test.ts tests/doubao-vision.test.ts tests/doubao-orientation.test.ts tests/fusion.test.ts tests/fusion-diagnose.test.ts tests/pg-diagnoses.test.ts tests/vision-diagnostics.test.ts tests/advanced-diagnosis.test.ts tests/diagnose-flow.test.ts tests/diagnosis-status-ui.test.ts tests/phase3.3-decision.test.ts tests/generate-style-image.test.ts tests/uploaded-image.test.ts",
+    "test:all": "npm run test:offline"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.99.0",
@@ -24,6 +34,7 @@
     "openai": "^6.39.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "sharp": "^0.35.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -34,6 +45,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.24",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

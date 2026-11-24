@@ -63,9 +63,43 @@ styleKeywords
 avoidColors
 source
 scores
+fusionDiagnosis
 ```
 
-安全规则限制已完成邮箱验证的用户或 Google 登录用户只能创建、读取和删除自己的记录。历史页按当前 `userId` 查询并在界面中按 `createdAt` 倒序展示。
+`fusionDiagnosis` 是可选字段，仅当服务端开启融合时写入；历史记录没有该字段时结果页仍可正常读取。安全规则限制已完成邮箱验证的用户或 Google 登录用户只能创建、读取和删除自己的记录。历史页按当前 `userId` 查询并在界面中按 `createdAt` 倒序展示。
+
+## CNN + Doubao 综合诊断（默认关闭）
+
+`/api/diagnose` 支持可选的固定权重融合：CNN 40% + Doubao 60%。默认 `FUSION_ENABLED=false`，此时接口行为与第一阶段完全一致，也不会发起任何付费视觉调用。
+
+启用方式（均需在服务端 `.env.local` 配置，且必须重启 Next.js）：
+
+```env
+FUSION_ENABLED=true
+FUSION_CNN_WEIGHT=0.4
+VISION_DIAGNOSIS_ENABLED=true
+ARK_API_KEY=...
+ARK_VISION_MODEL=...
+```
+
+两个开关必须同时为 `true` 才会调用 Doubao；`FUSION_CNN_WEIGHT` 非法会直接报错，不会静默使用错误权重。启用后顶层 `seasonType/confidence/scores` 取自综合结果，并额外返回 `fusionDiagnosis`；`confidence` 表示 top-1 融合分数，**不是**经过概率校准的真实置信度。完整接口契约见 [docs/fusion-diagnosis-api.md](./docs/fusion-diagnosis-api.md)。
+
+### 第三阶段：动态权重与异常诊断
+
+在融合开关开启时，新增本地图像质量预检、动态权重、模型分歧与诊断状态（详细设计与测试报告见 [docs/phase3-report.md](./docs/phase3-report.md)）：
+
+- 图像质量评估在付费视觉 API 调用**之前**用 `sharp` 完成；严重过曝、严重欠曝、严重模糊、分辨率不足直接返回 `RETAKE_REQUIRED`，不调用付费 API。
+- `fusionDiagnosis.version` 为 `"2.0"`，新增 `diagnosisStatus`（`CONFIDENT` / `UNCERTAIN` / `RETAKE_REQUIRED` / `DEGRADED` / `FAILED`）、`inferenceMode`、`imageQuality`、`modelAgreement`、`effectiveWeights`、`weightAdjustments`、`uncertaintyReasons`、`candidateSeasons`、`recommendations`、`confidenceType`。v1 字段全部保留。
+- 基准权重 `requestedWeights` 不被改写；默认无已验证依据时 `effectiveWeights = requestedWeights`，单模型降级时有效权重为 1/0 或 0/1，但**不代表置信度 100%**。
+- `UNCERTAIN` / `DEGRADED` 的光滑结果不展示确定性季型，且**不会覆盖用户画像季型**：`/api/user-profile/latest-diagnosis` 只返回 `CONFIDENT` 结果。
+- 所有阈值为开发阶段初始配置，**尚待独立验证集校准**。
+
+测试命令：
+
+```bash
+npm run test:offline    # 全部离线测试（含第三阶段）
+npm run test:advanced:unit
+```
 
 ## 本地运行
 

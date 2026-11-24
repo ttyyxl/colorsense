@@ -26,8 +26,28 @@ create table if not exists cs_diagnoses (
   face_confidence     double precision,
   ai_advice           jsonb,
   doubao_advice       jsonb,
+  fusion_diagnosis    jsonb,
+  diagnosis_status    text,
+  inference_mode      text,
+  uncertainty_reasons text[],
+  risks               jsonb,
+  decisive_reasons    text[],
+  soft_warnings       text[],
+  recommendations     text[],
+  has_valid_season_result boolean,
   created_at          timestamptz not null default now()
 );
+
+alter table cs_diagnoses add column if not exists fusion_diagnosis jsonb;
+alter table cs_diagnoses add column if not exists diagnosis_status text;
+alter table cs_diagnoses add column if not exists inference_mode text;
+alter table cs_diagnoses add column if not exists uncertainty_reasons text[];
+alter table cs_diagnoses add column if not exists risks jsonb;
+alter table cs_diagnoses add column if not exists decisive_reasons text[];
+alter table cs_diagnoses add column if not exists soft_warnings text[];
+alter table cs_diagnoses add column if not exists recommendations text[];
+alter table cs_diagnoses add column if not exists has_valid_season_result boolean;
+
 create index if not exists cs_diagnoses_user_created_idx
   on cs_diagnoses (user_id, created_at desc);
 

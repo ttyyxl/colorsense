@@ -90,3 +90,110 @@ inference_service/models/version2/*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Private keys and credentials
+*.pem
+*.key
+*service-account*.json
+*serviceAccountKey*.json
+*credentials*.json
+
+# Personal image datasets and experiments
+/experiements/
+/experiments/fusion/images/
+/experiments/fusion/generated/
+/experiments/fusion/predictions/
+/experiments/fusion/results/
+
+# Local logs
+*.log
+/logs/
+
+# Build artifacts
+/node_modules/
+/.next/
+/out/
+/coverage/
+
+# Python generated files
+__pycache__/
+*.pyc
+.venv/
+venv/
+# Phase 3.1 experiment: local caches, generated personal-image variants and raw results (never commit)
+/experiments/phase3.1/anomalies/
+/experiments/phase3.1/cache/
+/experiments/phase3.1/results/
+/experiments/phase3.1/figures/
+/.next-old-phase31/
+
+# ==============================
+# Environment variables & API keys
+# ==============================
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Credentials
+**/serviceAccountKey*.json
+**/service-account*.json
+**/firebase-adminsdk*.json
+**/credentials.json
+**/secrets.json
+**/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ==============================
+# AI Agent local configuration
+# ==============================
+.workbuddy/
+.claude/
+.codex/
+.cursor/
+.mcp.json
+
+# ==============================
+# Dependencies & build cache
+# ==============================
+node_modules/
+.next/
+.next-old*/
+out/
+dist/
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.pyc
+*.tsbuildinfo
+
+# ==============================
+# Logs & temporary files
+# ==============================
+*.log
+*.tmp
+*.bak
+*.zip
+
+# ==============================
+# Local data & user privacy
+# ==============================
+**/uploads/
+**/user_images/
+**/datasets/
+**/cache/
+**/caches/
+**/raw_images/
+**/model_cache/
+
+# Experiment outputs
+experiments/**/results/
