@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:vision": "node ./scripts/test-doubao-vision.ts",
+    "test:vision:unit": "node --test tests/vision-schema.test.ts tests/doubao-vision.test.ts",
+    "test:fusion:unit": "node --test tests/fusion.test.ts tests/fusion-diagnose.test.ts",
+    "test:vision:orientation": "node --test tests/doubao-orientation.test.ts",
+    "test:diagnostics:unit": "node --test tests/vision-diagnostics.test.ts",
+    "test:offline": "node --test tests/vision-schema.test.ts tests/doubao-vision.test.ts tests/doubao-orientation.test.ts tests/fusion.test.ts tests/fusion-diagnose.test.ts tests/vision-diagnostics.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.99.0",
@@ -26,6 +32,7 @@
     "openai": "^6.39.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "sharp": "^0.35.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

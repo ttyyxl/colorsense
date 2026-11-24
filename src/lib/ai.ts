@@ -2,10 +2,29 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { UserStyleProfilePromptContext } from "./user-profile-types";
 
-// --- Doubao 配置 ---
-const DOUBAO_API_KEY = "ark-df3720c0-0027-4cf1-9535-793826c8f74e-6aa66";
+// --- Doubao 配置（仅穿搭建议，与视觉诊断模块保持独立） ---
+// 密钥只能来自服务端环境变量；未配置时走既有 fallback，不记录密钥内容。
+const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY ?? "";
 const DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const DOUBAO_MODEL = "doubao-seed-2-0-pro-260215";
+
+function getDoubaoClient(): OpenAI | null {
+  if (!DOUBAO_API_KEY) {
+    console.error("[doubao-service] DOUBAO_API_KEY is not configured; using fallback.");
+    return null;
+  }
+  return new OpenAI({ apiKey: DOUBAO_API_KEY, baseURL: DOUBAO_BASE_URL });
+}
+
+// 仅保留错误类型与 HTTP 状态码，避免记录用户画像、Prompt 或模型原始响应。
+function logDoubaoFailure(scope: string, error: unknown): void {
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? (error as { status?: unknown }).status
+      : undefined;
+  const type = error instanceof Error ? error.name : typeof error;
+  console.error(`[${scope}] request failed`, { type, status });
+}
 
 // --- System Prompt ---
 // src/lib/ai.ts
@@ -218,10 +237,10 @@ export async function generateStyleAdvice(input: {
   keywords: string[];
   userProfile?: UserStyleProfilePromptContext;
 }): Promise<AiOutput & { source: "doubao" | "fallback" }> {
-  const openai = new OpenAI({
-    apiKey: DOUBAO_API_KEY,
-    baseURL: DOUBAO_BASE_URL,
-  });
+  const openai = getDoubaoClient();
+  if (!openai) {
+    return FALLBACK_RESPONSE as AiOutput & { source: "fallback" };
+  }
 
   let userProfileText = "";
   if (input.userProfile) {
@@ -245,8 +264,7 @@ export async function generateStyleAdvice(input: {
   const userPrompt = `用户季型分析结果如下：\n季型：${input.season}\n置信度：${input.confidence.toFixed(2)}\nLAB肤色特征：L=${input.lab_features.L.toFixed(2)}, a=${input.lab_features.a.toFixed(2)}, b=${input.lab_features.b.toFixed(2)}\n${userProfileText}
 \n请根据以上信息，为用户生成一份详细的色彩穿搭建议，并严格按照指定的 JSON 格式输出。`;
 
-  console.log("[doubao-request]", userPrompt);
-
+  // userPrompt 含用户画像信息，禁止写入日志。
   try {
     const response = await openai.chat.completions.create({
       model: DOUBAO_MODEL,
@@ -259,10 +277,9 @@ export async function generateStyleAdvice(input: {
     });
 
     const content = response.choices[0].message.content;
-    console.log("[doubao-response]", content);
 
     if (!content) {
-      console.error("[doubao-service] Doubao API 返回空内容，使用 fallback。");
+      console.error("[doubao-service] Doubao API returned empty content; using fallback.");
       return FALLBACK_RESPONSE as AiOutput & { source: "fallback" };
     }
 
@@ -274,26 +291,25 @@ export async function generateStyleAdvice(input: {
       console.log("[ai-source]", "doubao");
       return { ...validatedOutput, source: "doubao" };
     } catch (parseError) {
-      console.error("[doubao-service] JSON 解析或校验失败，内容：", content, "错误：", parseError);
+      logDoubaoFailure("doubao-service parse", parseError);
       return FALLBACK_RESPONSE as AiOutput & { source: "fallback" };
     }
   } catch (error) {
-    console.error("[doubao-service] Doubao API 调用失败，错误：", error);
+    logDoubaoFailure("doubao-service", error);
     return FALLBACK_RESPONSE as AiOutput & { source: "fallback" };
   }
 }
 export const generateDoubaoStyleAdvice = generateStyleAdvice;
 
 export async function generateProfileAdvice(userProfileSummary: string): Promise<ProfileOutput & { source: "doubao" | "fallback" }> {
-  const openai = new OpenAI({
-    apiKey: DOUBAO_API_KEY,
-    baseURL: DOUBAO_BASE_URL,
-  });
+  const openai = getDoubaoClient();
+  if (!openai) {
+    return PROFILE_FALLBACK_RESPONSE as ProfileOutput & { source: "fallback" };
+  }
 
   const userPrompt = `用户个人形象问卷总结如下：\n${userProfileSummary}\n\n请根据以上信息，为用户生成一份全面的个人形象档案，并严格按照指定的 JSON 格式输出。`;
 
-  console.log("[doubao-profile-request]", userPrompt);
-
+  // userProfileSummary 属于敏感个人信息，禁止写入日志。
   try {
     const response = await openai.chat.completions.create({
       model: DOUBAO_MODEL,
@@ -306,10 +322,9 @@ export async function generateProfileAdvice(userProfileSummary: string): Promise
     });
 
     const content = response.choices[0].message.content;
-    console.log("[doubao-profile-response]", content);
 
     if (!content) {
-      console.error("[doubao-profile-service] Doubao API 返回空内容，使用 fallback。");
+      console.error("[doubao-profile-service] Doubao API returned empty content; using fallback.");
       return PROFILE_FALLBACK_RESPONSE as ProfileOutput & { source: "fallback" };
     }
 
@@ -320,11 +335,11 @@ export async function generateProfileAdvice(userProfileSummary: string): Promise
       console.log("[ai-profile-source]", "doubao");
       return { ...validatedOutput, source: "doubao" };
     } catch (parseError) {
-      console.error("[doubao-profile-service] JSON 解析或校验失败，内容：", content, "错误：", parseError);
+      logDoubaoFailure("doubao-profile-service parse", parseError);
       return PROFILE_FALLBACK_RESPONSE as ProfileOutput & { source: "fallback" };
     }
   } catch (error) {
-    console.error("[doubao-profile-service] Doubao API 调用失败，错误：", error);
+    logDoubaoFailure("doubao-profile-service", error);
     return PROFILE_FALLBACK_RESPONSE as ProfileOutput & { source: "fallback" };
   }
 }

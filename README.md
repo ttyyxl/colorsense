@@ -63,9 +63,26 @@ styleKeywords
 avoidColors
 source
 scores
+fusionDiagnosis
 ```
 
-安全规则限制已完成邮箱验证的用户或 Google 登录用户只能创建、读取和删除自己的记录。历史页按当前 `userId` 查询并在界面中按 `createdAt` 倒序展示。
+`fusionDiagnosis` 是可选字段，仅当服务端开启融合时写入；历史记录没有该字段时结果页仍可正常读取。安全规则限制已完成邮箱验证的用户或 Google 登录用户只能创建、读取和删除自己的记录。历史页按当前 `userId` 查询并在界面中按 `createdAt` 倒序展示。
+
+## CNN + Doubao 综合诊断（默认关闭）
+
+`/api/diagnose` 支持可选的固定权重融合：CNN 40% + Doubao 60%。默认 `FUSION_ENABLED=false`，此时接口行为与第一阶段完全一致，也不会发起任何付费视觉调用。
+
+启用方式（均需在服务端 `.env.local` 配置，且必须重启 Next.js）：
+
+```env
+FUSION_ENABLED=true
+FUSION_CNN_WEIGHT=0.4
+VISION_DIAGNOSIS_ENABLED=true
+ARK_API_KEY=...
+ARK_VISION_MODEL=...
+```
+
+两个开关必须同时为 `true` 才会调用 Doubao；`FUSION_CNN_WEIGHT` 非法会直接报错，不会静默使用错误权重。启用后顶层 `seasonType/confidence/scores` 取自综合结果，并额外返回 `fusionDiagnosis`；`confidence` 表示 top-1 融合分数，**不是**经过概率校准的真实置信度。完整接口契约见 [docs/fusion-diagnosis-api.md](./docs/fusion-diagnosis-api.md)。
 
 ## 本地运行
 

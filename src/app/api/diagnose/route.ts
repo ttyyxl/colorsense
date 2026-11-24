@@ -7,6 +7,17 @@ import { generateDoubaoStyleAdvice } from "@/lib/ai";
 import type { DiagnosisQuality } from "@/lib/types";
 import { getUserProfile } from "@/lib/firestore-user-profiles";
 import { buildUserProfilePromptContext } from "@/lib/user-profile-summary";
+import { analyzeSeasonWithDoubao, readVisionConfigFromEnv } from "@/lib/doubao-vision";
+import type { VisionAnalysisResult } from "@/lib/doubao-vision";
+import {
+  classifyVisionFailure,
+  FusionConfigError,
+  FusionUnavailableError,
+  readFusionConfig,
+  type DoubaoFusionInput,
+  type FusionUnavailableCode,
+} from "@/lib/fusion";
+import { assembleDiagnosisFields, buildDiagnosisRecord } from "@/lib/fusion-api";
 
 export const runtime = "nodejs";
 
@@ -116,19 +127,52 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 3. 调用推理服务
-    const inference = await runInference(image);
+    // 3. 读取融合配置。FUSION_ENABLED=false 时保持第一阶段完整行为。
+    const fusionConfig = readFusionConfig(process.env);
+
+    // Doubao 视觉模块有独立总开关；两个开关必须同时打开才会发起付费调用。
+    // 这里只检查配置是否可用，不读取、不打印任何密钥内容。
+    let doubaoUnavailableCode: FusionUnavailableCode | undefined;
+    if (fusionConfig.enabled) {
+      const visionMasterEnabled =
+        (process.env.VISION_DIAGNOSIS_ENABLED ?? "false").trim().toLowerCase() === "true";
+      if (!visionMasterEnabled) {
+        doubaoUnavailableCode = "DOUBAO_MASTER_DISABLED";
+      } else {
+        try {
+          readVisionConfigFromEnv();
+        } catch (error) {
+          doubaoUnavailableCode = classifyVisionFailure(error);
+        }
+      }
+    }
+    const shouldCallDoubao = fusionConfig.enabled && doubaoUnavailableCode === undefined;
+
+    // 4. 并行执行 CNN 推理与 Doubao 视觉诊断：一个模型失败不会丢弃另一个的有效结果。
+    const cnnTask = runInference(image);
+    const doubaoTask: Promise<VisionAnalysisResult | null> = shouldCallDoubao
+      ? (async () => {
+          const imageBytes = new Uint8Array(await image.arrayBuffer());
+          return analyzeSeasonWithDoubao(imageBytes, image.type);
+        })()
+      : Promise.resolve(null);
+    const [cnnSettled, doubaoSettled] = await Promise.allSettled([cnnTask, doubaoTask]);
+
+    // 5. CNN 结果：保留原有错误分类、人脸质量门控与季型校验。
+    if (cnnSettled.status === "rejected") {
+      throw cnnSettled.reason;
+    }
+    const inference = cnnSettled.value;
 
     if (inference.source !== "model") {
       throw new ModelUnavailableError();
     }
 
-    // 4. 验证人脸检测结果
     const faceDetected = inference.quality?.faceDetected ?? inference.faceDetected;
     const usedOriginalImage = inference.quality?.usedOriginalImage ?? inference.usedOriginalImage;
     const faceConfidence = inference.quality?.faceConfidence ?? inference.face_confidence;
-    
-    if (faceDetected !== true || usedOriginalImage !== false || 
+
+    if (faceDetected !== true || usedOriginalImage !== false ||
         typeof faceConfidence !== "number" || faceConfidence < MIN_FACE_CONFIDENCE) {
       throw new NoClearFaceError(NO_CLEAR_FACE_MESSAGE, {
         faceDetected: faceDetected ?? false,
@@ -137,24 +181,54 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. 验证季节类型
     if (!isSeasonType(inference.season)) {
       throw new Error("Inference service returned an unsupported season.");
     }
 
-    // 6. 准备基础数据
-    const season = SEASONS[inference.season];
+    // 6. Doubao 结果：失败/拒判由融合层统一降级，只记录机器可读代码与安全元信息。
+    let doubao: DoubaoFusionInput | null = null;
+    let doubaoCode: FusionUnavailableCode = doubaoUnavailableCode ??
+      (fusionConfig.enabled ? "DOUBAO_MISSING" : "FUSION_DISABLED");
+    if (doubaoSettled.status === "rejected") {
+      doubaoCode = classifyVisionFailure(doubaoSettled.reason);
+      const failure = doubaoSettled.reason as { status?: unknown };
+      console.error("[diagnose-fusion] doubao unavailable", {
+        code: doubaoCode,
+        status: typeof failure?.status === "number" ? failure.status : undefined,
+      });
+    } else if (doubaoSettled.value) {
+      doubao = doubaoSettled.value;
+      doubaoCode = "OK";
+    }
+
+    // 7. 顶层 season/confidence/scores 与 fusionDiagnosis 始终来自同一个结果对象。
+    const fields = assembleDiagnosisFields({
+      fusionEnabled: fusionConfig.enabled,
+      cnnWeight: fusionConfig.cnnWeight,
+      cnn: { season: inference.season, scores: inference.scores },
+      cnnCode: "OK",
+      doubao,
+      doubaoCode,
+      legacy: {
+        seasonType: inference.season,
+        confidence: inference.confidence,
+        scores: inference.scores,
+      },
+    });
+
+    const finalSeason = fields.seasonType;
+    const season = SEASONS[finalSeason];
     const labFeatures = inference.lab_features ?? { L: 65, a: 8, b: 12 };
-    
-    // 7. 获取用户画像
+
+    // 8. 获取用户画像
     const userProfile = await getUserProfile(user.uid);
     const userProfileContext = userProfile ? buildUserProfilePromptContext(userProfile) : undefined;
 
-    // 8. 【关键】先生成 AI 建议（使用季节的基础数据，而不是 diagnosis）
+    // 9. 风格建议与最终季型保持一致，避免与综合结果矛盾。
     console.info("[diagnose-debug] 开始生成豆包风格建议...");
     const doubaoAdvice = await generateDoubaoStyleAdvice({
-      season: inference.season,
-      confidence: inference.confidence,
+      season: finalSeason,
+      confidence: fields.confidence,
       lab_features: labFeatures,
       userProfile: userProfileContext,
       recommended_colors: season.palette.slice(0, 3),  // 使用季节色板
@@ -165,34 +239,30 @@ export async function POST(request: Request) {
       return null;
     });
 
-    // 9. 【然后】创建诊断对象（此时 doubaoAdvice 已经存在）
+    // 10. 创建诊断对象
     const diagnosis = {
-      seasonType: inference.season,
-      confidence: inference.confidence,
+      ...fields,
       colorPalette: doubaoAdvice?.personalized_color_palette || season.palette, // 优先使用个性化色板
       styleKeywords: season.keywords,
       avoidColors: season.avoid,
       aiDescription: season.styleDesc,
       labFeatures: labFeatures,
       source: inference.source,
-      scores: inference.scores,
       faceDetected,
       usedOriginalImage,
       faceConfidence,
     };
-    
-    const { scores, ...requiredDiagnosisFields } = diagnosis;
 
-    // 10. 保存到数据库
+    // 11. 保存到数据库（fusionDiagnosis 为可选字段，老记录无需迁移）。
     let diagnosisId: string;
     try {
-      const docRef = await getAdminDb().collection("diagnoses").add({
-        ...requiredDiagnosisFields,
-        ...(scores === undefined ? {} : { scores }),
-        doubaoAdvice,
-        userId: user.uid,
-        createdAt: new Date(),
-      });
+      const docRef = await getAdminDb().collection("diagnoses").add(
+        buildDiagnosisRecord(diagnosis, {
+          doubaoAdvice,
+          userId: user.uid,
+          createdAt: new Date(),
+        })
+      );
       diagnosisId = docRef.id;
       console.info("[diagnose-debug] 保存成功", { diagnosisId });
     } catch (error) {
@@ -200,7 +270,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "诊断完成，但保存结果失败，请稍后重试。" }, { status: 500 });
     }
 
-    // 11. 返回结果
+    // 12. 返回结果
     return NextResponse.json({
       success: true,
       diagnosisId,
@@ -209,9 +279,27 @@ export async function POST(request: Request) {
         doubaoAdvice,
       },
     });
-    
+
   } catch (error) {
     // 错误处理
+    if (error instanceof FusionConfigError) {
+      return NextResponse.json(
+        { success: false, error: error.code, message: error.message },
+        { status: 500 }
+      );
+    }
+    if (error instanceof FusionUnavailableError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "DIAGNOSIS_FAILED",
+          code: error.code,
+          message: "两个模型均无法给出有效的四季评分，请上传光线更合适的正面照片后重试。",
+          fallbackDetails: error.details,
+        },
+        { status: 422 }
+      );
+    }
     if (error instanceof NoClearFaceError) {
       return NextResponse.json(
         { success: false, error: "NO_CLEAR_FACE", message: error.message, quality: error.quality },

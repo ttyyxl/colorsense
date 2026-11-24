@@ -90,3 +90,38 @@ inference_service/models/version2/*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Private keys and credentials
+*.pem
+*.key
+*service-account*.json
+*serviceAccountKey*.json
+*credentials*.json
+
+# Personal image datasets and experiments
+/experiements/
+/experiments/fusion/images/
+/experiments/fusion/generated/
+/experiments/fusion/predictions/
+/experiments/fusion/results/
+
+# Local logs
+*.log
+/logs/
+
+# Build artifacts
+/node_modules/
+/.next/
+/out/
+/coverage/
+
+# Python generated files
+__pycache__/
+*.pyc
+.venv/
+venv/

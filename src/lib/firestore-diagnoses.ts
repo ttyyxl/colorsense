@@ -10,10 +10,12 @@ function getDiagnosesCollection() {
 }
 
 export async function createDiagnosis(userId: string, input: NewDiagnosis) {
-  const { scores, ...requiredFields } = input;
+  const { scores, fusionDiagnosis, ...requiredFields } = input;
   const ref = await addDoc(getDiagnosesCollection(), {
     ...requiredFields,
     ...(scores === undefined ? {} : { scores }),
+    // 可选字段：老记录没有该字段时读取逻辑不变，无需数据迁移。
+    ...(fusionDiagnosis === undefined ? {} : { fusionDiagnosis }),
     userId,
     createdAt: serverTimestamp(),
   });

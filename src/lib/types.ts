@@ -1,5 +1,6 @@
 import type { SeasonType } from "./seasons";
 import type { DoubaoStyleAdvice } from "./ai";
+import type { FusionDiagnosis } from "./fusion";
 
 export interface LabFeatures {
   L: number;
@@ -71,6 +72,8 @@ export interface Diagnosis {
   faceConfidence?: number;
   aiAdvice?: AiAdvice;
   doubaoAdvice?: DoubaoStyleAdvice;
+  /** 可选：CNN + Doubao 综合诊断结果；FUSION_ENABLED=false 或未开启融合的记录不含此字段。 */
+  fusionDiagnosis?: FusionDiagnosis;
 }
 
 export type NewDiagnosis = Omit<Diagnosis, "id" | "userId" | "createdAt">;
