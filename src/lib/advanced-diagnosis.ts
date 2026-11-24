@@ -34,6 +34,16 @@ import type {
  *
  * RETAKE_REQUIRED / FAILED 不生成 fusion 结果（不产生可被误用的季型）。
  * UNCERTAIN / DEGRADED 生成带状态的候选结果，供前端差异化展示。
+ *
+ * Phase 3.3「季型诊断决策机制优化」：
+ * - **取消最高融合评分阈值门槛**：只要图片通过必要的质量检测，且至少一个模型
+ *   能给出合法有效的季型评分，就用 argmax 选取最终评分最高的季型。
+ *   minTopScore / minTopGap 等阈值不再决定是否返回季型，只作为不确定性提示。
+ * - **豆包不得单方面否决有效的 CNN 判断**：豆包主动拒判、超时或返回无效评分时，
+ *   只要 CNN 结果有效就自动采用 CNN 结果（source = "cnn"）。
+ * - **不人为抬高评分**：seasonScores 始终是模型原始评分的归一化/加权融合结果，
+ *   顶层 seasonType / confidence / scores 与 fusionDiagnosis 严格同源。
+ * - 硬阻断仅保留两处：严重图像质量问题（REJECT）与两模型均不可用。
  */
 
 export interface ReliabilityInput {
@@ -46,7 +56,7 @@ export interface AdvancedDiagnosisInput {
   doubao: DoubaoFusionInput | null;
   cnnCode?: FusionUnavailableCode;
   doubaoCode?: FusionUnavailableCode;
-  /** 用户配置的基准 CNN 权重；默认 0.4。requestedWeights 不被动态算法改写。 */
+  /** 用户配置的基准 CNN 权重；默认 0.6（见 DEFAULT_CNN_WEIGHT）。requestedWeights 不被动态算法改写。 */
   cnnWeight?: number;
   imageQuality: ImageQualityAssessment;
   /** 已验证的模型可靠性系数；默认中性 1，禁止伪造实验结果。 */
@@ -59,6 +69,12 @@ export interface AdvancedDiagnosisInput {
 
 export interface AdvancedDiagnosisResult {
   fusion: AdvancedFusionDiagnosis | null;
+  /**
+   * Phase 3.3：是否存在合法有效的季型结果。
+   * true 表示可以展示季型、色板、画像并生成后续穿搭建议（无论诊断状态是否
+   * 为 UNCERTAIN / DEGRADED）；false 表示处于硬阻断场景，禁止生成虚假结论。
+   */
+  hasValidSeasonResult: boolean;
   diagnosisStatus: AdvancedFusionDiagnosis["diagnosisStatus"];
   inferenceMode: AdvancedFusionDiagnosis["inferenceMode"];
   uncertaintyReasons: string[];
@@ -109,6 +125,7 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
   if (imageQuality.qualityLevel === "REJECT") {
     return {
       fusion: null,
+      hasValidSeasonResult: false,
       diagnosisStatus: "RETAKE_REQUIRED",
       inferenceMode:
         input.cnn && input.doubao ? "dual"
@@ -153,6 +170,7 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
   if (!cnnUsable && !doubaoUsable) {
     return {
       fusion: null,
+      hasValidSeasonResult: false,
       diagnosisStatus: "FAILED",
       inferenceMode: "unavailable",
       uncertaintyReasons: ["ALL_MODELS_UNAVAILABLE"],
@@ -182,6 +200,7 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
   if (!weights.normalized) {
     return {
       fusion: null,
+      hasValidSeasonResult: false,
       diagnosisStatus: "FAILED",
       inferenceMode: "unavailable",
       uncertaintyReasons: ["WEIGHT_NORMALIZATION_FAILED"],
@@ -223,6 +242,7 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
   } else {
     return {
       fusion: null,
+      hasValidSeasonResult: false,
       diagnosisStatus: "FAILED",
       inferenceMode: "unavailable",
       uncertaintyReasons: ["ALL_MODELS_UNAVAILABLE"],
@@ -233,6 +253,8 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
       blockedCode: "ALL_MODELS_UNAVAILABLE",
     };
   }
+  // Phase 3.3：季型一律由最终评分的 argmax 决定，不再受最高分阈值限制。
+  // 模型原始评分不被抬高或修改；此处只做确定性并列处理。
   const predictedSeason = argmaxSeason(seasonScores);
 
   // 6. 模型分歧（单模型时无分布差异可比）。
@@ -322,6 +344,8 @@ export function buildAdvancedDiagnosis(input: AdvancedDiagnosisInput): AdvancedD
 
   return {
     fusion,
+    // Phase 3.3：存在有效季型结果即可执行业务；诊断状态只表达可信程度。
+    hasValidSeasonResult: true,
     diagnosisStatus: decision.status,
     inferenceMode: decision.inferenceMode,
     uncertaintyReasons: decision.uncertaintyReasons,

@@ -5,6 +5,14 @@
  * - 以下数值均为开发阶段的初始实验配置，**尚未经过独立验证集校准**，不是科学验证结果。
  * - 禁止在其他文件中重复硬编码这些阈值；禁止为了让正常诊断比例变高而随意放宽。
  * - 未来调整应使用验证集选参，再用独立测试集评估，并记录实验依据。
+ *
+ * Phase 3.3「季型诊断决策机制优化」说明：
+ * - 取消「最高融合评分必须达到 50% 才能确认季型」的业务限制。分数阈值只用于生成
+ *   **不确定性提示**，不再决定是否返回季型。
+ * - 只要图片通过必要的质量检测，且至少一个模型能给出合法有效的季型评分，就采用
+ *   argmax 选取最终评分最高的季型。
+ * - 诊断可信程度（CONFIDENT / UNCERTAIN / DEGRADED）与业务可执行性**解耦**：
+ *   只有硬阻断场景（严重图像质量问题、两模型均不可用）才不产出季型。
  */
 
 /** 季型顺序，与 vision-schema.ts / fusion.ts 保持一致。 */
@@ -14,16 +22,47 @@ export const SEASON_ORDER = ["spring", "summer", "autumn", "winter"] as const;
 export const SCORE_TIE_EPSILON = 1e-9;
 
 /**
+ * Phase 3.3 季型决策策略（业务规则，不含可调数值）。
+ *
+ * 这里只声明**规则**，不存放阈值；阈值仍在 UNCERTAINTY_THRESHOLDS 中集中管理，
+ * 避免同一类参数散落在多个文件里。
+ */
+export const SEASON_DECISION_POLICY = {
+  /**
+   * 是否要求最高融合评分达到 minTopScore 才允许给出季型。
+   * Phase 3.3 起为 false：分数不足只提示不确定性，不再阻断季型输出。
+   */
+  requireMinTopScoreForSeason: false,
+  /**
+   * 是否允许「至少一个模型给出合法评分」即确定季型。
+   * true：单模型（CNN 或豆包）结果同样有效，豆包不得单方面否决有效的 CNN 判断。
+   */
+  allowSingleValidModel: true,
+  /**
+   * UNCERTAIN / DEGRADED 是否允许继续执行业务（展示季型、色板、画像、生成穿搭建议）。
+   * true：可信程度只用于提示，不阻断业务链路。
+   */
+  allowUncertainExecution: true,
+  /**
+   * 硬阻断状态集合：这些状态下不产生任何季型，禁止生成虚假诊断结果。
+   */
+  blockingStatuses: ["RETAKE_REQUIRED", "FAILED"] as const,
+} as const;
+
+/**
  * 不确定性阈值（初始配置，待独立验证集校准）。
+ *
+ * Phase 3.3 起，这些阈值**只用于生成不确定性提示**（状态标记与风险信息），
+ * 不再作为「是否返回季型结果」的门槛。
  */
 export const UNCERTAINTY_THRESHOLDS = {
-  /** 综合最高季型分数低于该值 → 存在不确定风险（初始 0.50）。 */
+  /** 综合最高季型分数低于该值 → 记录不确定性提示（不再阻断季型输出）。 */
   minTopScore: 0.5,
-  /** 融合结果第一名与第二名差距低于该值 → 明显分类模糊（初始 0.10）。 */
+  /** 融合结果第一名与第二名差距低于该值 → 明显分类模糊（记录不确定性提示）。 */
   minTopGap: 0.1,
-  /** 两模型总变差距离达到该值 → 较大分布分歧（初始 0.40）。 */
+  /** 两模型总变差距离达到该值 → 较大分布分歧（记录不确定性提示）。 */
   totalVariationDistance: 0.4,
-  /** 单模型 top1-top2 差距低于该值 → 该模型自身区分度不足。 */
+  /** 单模型 top1-top2 差距低于该值 → 该模型自身区分度不足（记录不确定性提示）。 */
   minModelTopGap: 0.08,
 } as const;
 
@@ -38,7 +77,10 @@ export type UncertaintyThresholds = {
  * 每个诊断原因都归入唯一的风险等级、相关性分组与所属域：
  * - SOFT_WARNING：轻度质量/环境提示，保留但**不单独**阻止正式诊断。
  * - DECISIVE_RISK：足以影响诊断可信度，命中即进入 UNCERTAIN。
+ *   Phase 3.3 起它**只影响诊断状态的可靠性标记**，不再阻断业务链路
+ *   （仍会返回季型、色板、画像与穿搭建议，只是附带不确定性提示）。
  * - BLOCKING_ISSUE：无法支持可靠诊断，对应 RETAKE_REQUIRED / FAILED。
+ *   这是**唯一**会阻断业务、且不得产出任何季型的等级。
  *
  * 分组的意义：同一分组内的多条风险高度相关，不应被重复计为「多项相互独立的
  * 风险」。例如 IMAGE_QUALITY_WARNING 与 DOUBAO_LIGHTING_WARNING 都属于
@@ -60,7 +102,7 @@ export const DIAGNOSIS_RISK_CLASSIFICATION = {
   UNDEREXPOSED: { level: "BLOCKING_ISSUE", group: "blocking", domain: "blocking", escalates: false },
   SEVERE_BLUR: { level: "BLOCKING_ISSUE", group: "blocking", domain: "blocking", escalates: false },
 
-  // ---- 决定性风险：模型侧 ----
+  // ---- 决定性风险：模型侧（只影响可靠性标记，不阻断业务） ----
   TOP_SCORE_BELOW_THRESHOLD: { level: "DECISIVE_RISK", group: "score-margin", domain: "model", escalates: false },
   TOP_GAP_BELOW_THRESHOLD: { level: "DECISIVE_RISK", group: "score-margin", domain: "model", escalates: false },
   MODEL_DISTRIBUTION_DISAGREEMENT: { level: "DECISIVE_RISK", group: "model-agreement", domain: "model", escalates: false },
@@ -121,6 +163,9 @@ export type RiskClassification = {
  *   或命中多个**相互独立**的风险分组时，才判为 UNCERTAIN。
  * - mode="legacy"：Phase 3.1 的旧规则（除 MODEL_TOP1_MISMATCH 外任何原因都判
  *   UNCERTAIN）。**仅用于离线对照复现历史结果，不得用于生产。**
+ *
+ * Phase 3.3 说明：无论哪种模式，风险策略只决定**诊断状态**（可信程度），
+ * 不再决定是否返回季型或是否阻断业务。
  */
 export const RISK_POLICY = {
   mode: "layered" as "layered" | "legacy",

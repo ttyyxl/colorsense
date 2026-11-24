@@ -4,6 +4,7 @@ import {
   UNCERTAINTY_THRESHOLDS as U,
   DIAGNOSIS_RISK_CLASSIFICATION,
   RISK_POLICY,
+  SEASON_DECISION_POLICY,
   type RiskClassification,
   type RiskPolicyConfig,
   type UncertaintyThresholds,
@@ -15,6 +16,7 @@ import type {
   InferenceMode,
   ModelAgreement,
 } from "./diagnosis-types.ts";
+import { isAdvancedFusionDiagnosis } from "./diagnosis-types.ts";
 
 /**
  * 诊断状态决策（与季型名称完全解耦）。
@@ -33,7 +35,61 @@ import type {
  * - 普通软警告（轻度色偏、光照提示、Top-1 不一致但分布接近）不再单独触发 UNCERTAIN；
  * - 豆包「主动拒判」（API 成功、模型明确不可靠）与「服务异常」彻底分离：
  *   前者进入 UNCERTAIN，后者才进入 DEGRADED。
+ *
+ * Phase 3.3「决策机制优化」要点（**可信程度与业务可执行性解耦**）：
+ * - 最高分不足阈值、Top-1/Top-2 分差过小、两模型判断不一致等，只作为
+ *   **不确定性提示**记录在风险信息中，不再阻止返回季型结果；
+ * - 只有 RETAKE_REQUIRED / FAILED 是硬阻断状态；其余状态（CONFIDENT /
+ *   UNCERTAIN / DEGRADED）在存在有效季型结果时都可以继续执行业务；
+ * - 豆包主动拒判 / 超时 / 返回无效评分时，只要 CNN 结果有效就采用 CNN 结果，
+ *   不允许豆包单方面否决有效的 CNN 判断。
  */
+
+/**
+ * 状态是否属于硬阻断（不产出季型、不进入下游链路）。
+ *
+ * Phase 3.3 起，这是**唯一**会阻断业务的判定：严重图像质量问题或两模型均不可用。
+ */
+export function isBlockingDiagnosisStatus(status: DiagnosisStatus | string | undefined): boolean {
+  if (!status) return false;
+  return (SEASON_DECISION_POLICY.blockingStatuses as readonly string[]).includes(status);
+}
+
+/**
+ * 状态是否允许执行业务（展示季型、色板、画像，并生成后续穿搭建议）。
+ *
+ * 与 isBlockingDiagnosisStatus 互补：只要不处于硬阻断状态即允许执行业务，
+ * 即使本次诊断的可信程度较低（UNCERTAIN / DEGRADED）。
+ */
+export function isExecutableDiagnosisStatus(status: DiagnosisStatus | string | undefined): boolean {
+  return !isBlockingDiagnosisStatus(status);
+}
+
+/**
+ * 从诊断记录中解析诊断状态。
+ *
+ * 优先读取 fusionDiagnosis.diagnosisStatus，其次读取顶层 diagnosisStatus；
+ * 两者都缺失的旧记录按 CONFIDENT 处理（向后兼容，不代表已通过新版规则校验）。
+ */
+export function resolveDiagnosisStatusOf(record: {
+  diagnosisStatus?: unknown;
+  fusionDiagnosis?: unknown;
+}): string {
+  const fusion = record.fusionDiagnosis;
+  if (isAdvancedFusionDiagnosis(fusion)) {
+    return fusion.diagnosisStatus;
+  }
+  if (typeof record.diagnosisStatus === "string" && record.diagnosisStatus) {
+    return record.diagnosisStatus;
+  }
+  if (fusion && typeof fusion === "object" && fusion !== null) {
+    const status = (fusion as { diagnosisStatus?: unknown }).diagnosisStatus;
+    if (typeof status === "string" && status) {
+      return status;
+    }
+  }
+  return "CONFIDENT";
+}
 
 export interface DecideDiagnosisStatusInput {
   imageQuality: ImageQualityAssessment;
@@ -59,6 +115,12 @@ export interface DecideDiagnosisStatusInput {
 
 export interface DiagnosisStatusDecision {
   status: DiagnosisStatus;
+  /**
+   * Phase 3.3：是否硬阻断。
+   * 只有 RETAKE_REQUIRED / FAILED 为 true；UNCERTAIN / DEGRADED 为 false
+   * （低可信度不得阻断业务链路）。
+   */
+  blocked: boolean;
   inferenceMode: InferenceMode;
   /** 全部风险原因（决定性 + 软警告），保持与历史记录兼容。 */
   uncertaintyReasons: string[];
@@ -118,6 +180,7 @@ export function decideDiagnosisStatus(input: DecideDiagnosisStatusInput): Diagno
     addRisk("IMAGE_QUALITY_REJECT");
     return {
       status: "RETAKE_REQUIRED",
+      blocked: true,
       inferenceMode,
       uncertaintyReasons: ["IMAGE_QUALITY_REJECT"],
       risks,
@@ -132,6 +195,7 @@ export function decideDiagnosisStatus(input: DecideDiagnosisStatusInput): Diagno
     addRisk("ALL_MODELS_UNAVAILABLE");
     return {
       status: "FAILED",
+      blocked: true,
       inferenceMode: "unavailable",
       uncertaintyReasons: ["ALL_MODELS_UNAVAILABLE"],
       risks,
@@ -178,6 +242,7 @@ export function decideDiagnosisStatus(input: DecideDiagnosisStatusInput): Diagno
     }
     return {
       status: "DEGRADED",
+      blocked: false,
       inferenceMode,
       uncertaintyReasons: risks.map((risk) => risk.reason),
       risks,
@@ -236,6 +301,8 @@ export function decideDiagnosisStatus(input: DecideDiagnosisStatusInput): Diagno
 
   return {
     status,
+    // Phase 3.3：UNCERTAIN 只是可靠性标记，不是业务阻断。
+    blocked: false,
     inferenceMode,
     uncertaintyReasons: risks.map((risk) => risk.reason),
     risks,

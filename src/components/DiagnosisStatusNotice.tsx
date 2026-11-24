@@ -53,7 +53,9 @@ export function DiagnosisStatusNotice({ status, reasons = [], softWarnings = [],
 
       {presentation.showCandidates && candidates.length > 0 && (
         <div className="mt-4">
-          <p className="font-semibold">候选季型（非确定性结论）：</p>
+          <p className="font-semibold">
+            {presentation.carriesUncertainty ? "本次季型与备选（存在不确定性）：" : "候选季型（非确定性结论）："}
+          </p>
           <ul className="mt-2 space-y-1">
             {candidates.map((candidate, index) => (
               <li key={candidate.season}>

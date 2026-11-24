@@ -1,6 +1,7 @@
 import type { SeasonType } from "./seasons.ts";
 import {
   buildFusionDiagnosis,
+  DEFAULT_CNN_WEIGHT,
   type CnnFusionInput,
   type DoubaoFusionInput,
   type FusionDiagnosis,
@@ -90,6 +91,12 @@ export interface AssembleAdvancedInput extends AdvancedDiagnosisInput {
 export interface AssembledAdvancedFields {
   /** blocked 时不存在任何正式季型字段，前端不得展示确定性结论。 */
   blocked: boolean;
+  /**
+   * Phase 3.3：是否存在合法有效的季型结果。
+   * CONFIDENT / UNCERTAIN / DEGRADED 均为 true（允许展示与生成后续建议）；
+   * RETAKE_REQUIRED / FAILED 为 false。
+   */
+  hasValidSeasonResult: boolean;
   diagnosisStatus: AdvancedFusionDiagnosis["diagnosisStatus"];
   inferenceMode: AdvancedFusionDiagnosis["inferenceMode"];
   uncertaintyReasons: string[];
@@ -109,12 +116,16 @@ export interface AssembledAdvancedFields {
 /**
  * 第三阶段 v2 适配：v1 顶层字段在可诊断时与融合结果同源；
  * RETAKE_REQUIRED / FAILED 时不产生 seasonType/confidence/scores，杜绝虚假结论。
+ *
+ * Phase 3.3：顶层 seasonType / confidence / scores 始终取自最终融合结果
+ * （fusionDiagnosis.predictedSeason / seasonScores），不引入任何额外抬高；
+ * confidence 恒等于 scores[seasonType]，保证两处口径完全一致。
  */
 export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): AssembledAdvancedFields {
   const result = buildAdvancedDiagnosis(input);
   logVisionDiagnostics("fusion.result", {
     fusionEnabled: true,
-    cnnWeight: input.cnnWeight ?? 0.4,
+    cnnWeight: input.cnnWeight ?? DEFAULT_CNN_WEIGHT,
     source: result.fusion?.source,
     fallbackReason: result.fusion?.fallbackReason ?? result.blockedCode ?? null,
   });
@@ -122,6 +133,7 @@ export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): A
   if (!result.fusion) {
     return {
       blocked: true,
+      hasValidSeasonResult: false,
       diagnosisStatus: result.diagnosisStatus,
       inferenceMode: result.inferenceMode,
       uncertaintyReasons: result.uncertaintyReasons,
@@ -135,6 +147,8 @@ export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): A
   const fusion = result.fusion;
   return {
     blocked: false,
+    // Phase 3.3：低可信度（UNCERTAIN / DEGRADED）同样拥有有效季型结果，可继续执行业务。
+    hasValidSeasonResult: result.hasValidSeasonResult,
     diagnosisStatus: result.diagnosisStatus,
     inferenceMode: result.inferenceMode,
     uncertaintyReasons: result.uncertaintyReasons,
@@ -142,6 +156,7 @@ export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): A
     decisiveReasons: result.decisiveReasons,
     softWarnings: result.softWarnings,
     recommendations: result.recommendations,
+    // 顶层字段与 fusionDiagnosis 严格同源：同源季型、同源分数、同源置信度。
     seasonType: fusion.predictedSeason,
     confidence: fusion.seasonScores[fusion.predictedSeason],
     scores: fusion.seasonScores,

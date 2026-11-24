@@ -5,7 +5,7 @@ import type { ImageQualityAssessment } from "../src/lib/diagnosis-types.ts";
 import { buildAdvancedDiagnosis } from "../src/lib/advanced-diagnosis.ts";
 import { totalVariationDistance, evaluateModelAgreement } from "../src/lib/agreement.ts";
 import { computeEffectiveWeights } from "../src/lib/weighting.ts";
-import { FusionConfigError } from "../src/lib/fusion.ts";
+import { FusionConfigError, DEFAULT_CNN_WEIGHT } from "../src/lib/fusion.ts";
 
 function visionResult(
   scores: SeasonScores,
@@ -149,7 +149,7 @@ function runT(
   return buildAdvancedDiagnosis({
     cnn: cnn(cnnScores),
     doubao: { result: visionResult(doubaoScores, options.doubaoOverride) },
-    cnnWeight: options.cnnWeight ?? 0.4,
+    cnnWeight: options.cnnWeight ?? DEFAULT_CNN_WEIGHT,
     imageQuality: quality(imageLevel),
   });
 }
@@ -499,11 +499,13 @@ test("phase3.2: refusal never produces a formal season and never enters the user
     doubao: { result: visionResult(STRONG_DOUBAO, { can_judge_reliably: false }) },
     imageQuality: quality(),
   });
+  // Phase 3.3 起：拒判只影响诊断状态（可靠性标记），不再阻断业务。
+  // 但它仍然不是 CONFIDENT，状态语义保持不变。
   assert.notEqual(result.diagnosisStatus, "CONFIDENT");
-  // 画像/穿搭链路只采用 CONFIDENT 结果，故拒判结果不会覆盖正式画像。
-  assert.ok(result.diagnosisStatus !== "CONFIDENT");
+  assert.equal(result.diagnosisStatus, "UNCERTAIN");
+  assert.equal(result.hasValidSeasonResult, true);
+  assert.ok(result.fusion !== null);
 });
-
 test("phase3.2: legacy policy reproduces the Phase 3.1 outcome for the same inputs", () => {
   const refusal = buildAdvancedDiagnosis({
     cnn: cnn(STRONG_CNN),

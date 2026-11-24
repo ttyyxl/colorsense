@@ -10,14 +10,21 @@ export type StatusTone = "success" | "warning" | "danger" | "info";
 export interface StatusPresentation {
   title: string;
   tone: StatusTone;
-  /** 是否展示确定性季型结论（季型卡、色卡、风格建议、穿搭结论）。 */
+  /**
+   * 是否展示季型结论（季型卡、色卡、风格建议、穿搭结论）。
+   *
+   * Phase 3.3：诊断可信程度与业务可执行性解耦——UNCERTAIN / DEGRADED
+   * 只要存在有效季型结果，同样展示季型与后续建议，只是附加不确定性提示。
+   */
   showFormalSeason: boolean;
   /** 是否展示候选季型（Top-1 / Top-2 及分数）。 */
   showCandidates: boolean;
   /** 是否提供重新上传入口。 */
   showRetake: boolean;
-  /** 是否展示生成 OOTD 等依赖正式季型的入口。 */
+  /** 是否展示生成 OOTD 等依赖季型的下游入口。 */
   showDownstreamActions: boolean;
+  /** 本次结果是否携带不确定性提示（用于结果页附加说明）。 */
+  carriesUncertainty: boolean;
   description: string;
 }
 
@@ -29,16 +36,19 @@ const PRESENTATIONS: Record<DiagnosisStatus, StatusPresentation> = {
     showCandidates: false,
     showRetake: false,
     showDownstreamActions: true,
+    carriesUncertainty: false,
     description: "本次诊断满足当前诊断规则，可以展示正式季型与个性化建议。",
   },
   UNCERTAIN: {
     title: "本次诊断结果存在不确定性",
     tone: "warning",
-    showFormalSeason: false,
+    // Phase 3.3：不再因不确定性阻断业务——仍给出季型、色板与后续建议。
+    showFormalSeason: true,
     showCandidates: true,
     showRetake: true,
-    showDownstreamActions: false,
-    description: "两个模型的判断接近或存在分歧，本次不输出确定性季型。",
+    showDownstreamActions: true,
+    carriesUncertainty: true,
+    description: "两个模型的判断接近或存在分歧。本次仍会给出季型结果与个性化建议，但该结论存在不确定性，建议按下方建议优化照片后复诊以提高准确度。",
   },
   RETAKE_REQUIRED: {
     title: "照片质量不足，无法完成诊断",
@@ -47,16 +57,19 @@ const PRESENTATIONS: Record<DiagnosisStatus, StatusPresentation> = {
     showCandidates: false,
     showRetake: true,
     showDownstreamActions: false,
+    carriesUncertainty: false,
     description: "检测到明确影响诊断可靠性的图像问题，请按建议重新拍摄。",
   },
   DEGRADED: {
     title: "本次仅使用单一模型分析",
     tone: "info",
-    showFormalSeason: false,
+    // Phase 3.3：单模型降级同样允许展示与继续生成后续建议。
+    showFormalSeason: true,
     showCandidates: true,
     showRetake: true,
-    showDownstreamActions: false,
-    description: "另一模型本次不可用，结果存在局限，仅作为候选参考。",
+    showDownstreamActions: true,
+    carriesUncertainty: true,
+    description: "另一模型本次不可用。本次仍会给出基于可用模型的季型结果与个性化建议，建议在自然光下重新上传以完成双模型诊断。",
   },
   FAILED: {
     title: "诊断暂时无法完成",
@@ -65,6 +78,7 @@ const PRESENTATIONS: Record<DiagnosisStatus, StatusPresentation> = {
     showCandidates: false,
     showRetake: true,
     showDownstreamActions: false,
+    carriesUncertainty: false,
     description: "服务暂时无法给出有效结果，请稍后重试或重新上传照片。",
   },
 };

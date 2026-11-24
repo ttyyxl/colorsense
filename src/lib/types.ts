@@ -1,6 +1,7 @@
 import type { SeasonType } from "./seasons";
 import type { DoubaoStyleAdvice } from "./ai";
 import type { FusionDiagnosis } from "./fusion";
+import type { AdvancedFusionDiagnosis, DiagnosisStatus } from "./diagnosis-types";
 
 export interface LabFeatures {
   L: number;
@@ -72,8 +73,15 @@ export interface Diagnosis {
   faceConfidence?: number;
   aiAdvice?: AiAdvice;
   doubaoAdvice?: DoubaoStyleAdvice;
-  /** 可选：CNN + Doubao 综合诊断结果；FUSION_ENABLED=false 或未开启融合的记录不含此字段。 */
-  fusionDiagnosis?: FusionDiagnosis;
+  /**
+   * Phase 3.3：诊断可靠性状态。UNCERTAIN / DEGRADED 同样包含有效季型结果，
+   * 不会阻断展示与后续建议；仅 RETAKE_REQUIRED / FAILED 不产出季型。
+   */
+  diagnosisStatus?: DiagnosisStatus;
+  /** Phase 3.3：是否存在合法有效的季型结果（老记录缺失时按存在季型处理）。 */
+  hasValidSeasonResult?: boolean;
+  /** 可选：CNN + Doubao 综合诊断结果；v1 记录为 1.0，第三阶段记录为 2.0（含诊断状态）。 */
+  fusionDiagnosis?: FusionDiagnosis | AdvancedFusionDiagnosis;
 }
 
 export type NewDiagnosis = Omit<Diagnosis, "id" | "userId" | "createdAt">;

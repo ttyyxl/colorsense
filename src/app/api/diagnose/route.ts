@@ -19,6 +19,7 @@ import {
 } from "@/lib/fusion";
 import { assembleDiagnosisFields, assembleAdvancedDiagnosisFields, buildDiagnosisRecord } from "@/lib/fusion-api";
 import { assessImageQuality, mergeFaceSignalIntoQuality } from "@/lib/image-quality";
+import { isExecutableDiagnosisStatus } from "@/lib/diagnosis-status";
 import type { DiagnosisRiskEntry } from "@/lib/diagnosis-types";
 
 export const runtime = "nodejs";
@@ -305,14 +306,19 @@ export async function POST(request: Request) {
     const finalSeason = fields.seasonType as SeasonType;
     const season = SEASONS[finalSeason];
     const labFeatures = inference.lab_features ?? { L: 65, a: 8, b: 12 };
-    const isFormal = diagnosisStatus === "CONFIDENT";
+    // Phase 3.3：诊断可信程度与业务可执行性解耦。
+    // 只要存在有效季型结果（未处于 RETAKE_REQUIRED / FAILED 硬阻断），就允许生成
+    // 个性化建议；UNCERTAIN / DEGRADED 会在结果与建议中明确提示不确定性。
+    const hasValidSeasonResult = isExecutableDiagnosisStatus(diagnosisStatus);
 
     // 10. 获取用户画像
     const userProfile = await getUserProfile(user.uid);
     const userProfileContext = userProfile ? buildUserProfilePromptContext(userProfile) : undefined;
 
-    // 11. 风格建议：仅正式结果生成个性化付费建议，避免不确定/降级结果被误用并节省成本。
-    const doubaoAdvice = isFormal
+    // 11. 风格建议：只要存在有效季型结果就生成个性化建议。
+    //     Phase 3.3 起不再以 diagnosisStatus === "CONFIDENT" 作为前置条件——
+    //     低置信度结果同样允许生成后续穿搭建议，只是不确定性提示随结果一并返回。
+    const doubaoAdvice = hasValidSeasonResult
       ? await generateDoubaoStyleAdvice({
           season: finalSeason,
           confidence: fields.confidence as number,
@@ -336,6 +342,8 @@ export async function POST(request: Request) {
       faceDetected,
       usedOriginalImage,
       faceConfidence,
+      // Phase 3.3：显式记录「存在有效季型结果」，供历史记录与下游链路判断是否可执行。
+      hasValidSeasonResult,
     };
 
     // 13. 保存诊断记录。
@@ -366,6 +374,7 @@ export async function POST(request: Request) {
         decisiveReasons,
         softWarnings,
         recommendations,
+        hasValidSeasonResult,
         doubaoAdvice,
       },
     });

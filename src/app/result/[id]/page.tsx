@@ -8,6 +8,7 @@ import { SeasonCard } from "@/components/SeasonCard";
 import { AiAdviceSection } from "@/components/AiAdviceSection";
 import { DoubaoAdviceSection } from "@/components/DoubaoAdviceSection";
 import { ShareModal } from "@/components/ShareModal";
+import { StyleImageCard } from "@/components/StyleImageCard";
 import { getUserDiagnosis } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
@@ -154,6 +155,16 @@ export default function ResultPage({ params }: ResultPageProps) {
                     </section>
                   )}
                   <SeasonCard season={season} confidence={diagnosis.confidence} />
+                  {/* Phase 3.3：低置信度结果同样展示季型，但必须在结论旁明确提示不确定性。 */}
+                  {presentation.carriesUncertainty && (
+                    <section className="rounded-[20px] border border-amber-300 bg-amber-50 p-5 text-amber-900">
+                      <p className="font-semibold">本次季型结论存在不确定性</p>
+                      <p className="mt-2 leading-7">
+                        当前诊断状态为「{diagnosisStatus}」。本次结果仍可用于配色与穿搭参考，
+                        但准确度低于常规诊断；建议按下方改善建议优化照片后复诊，以获得更稳定的季型判断。
+                      </p>
+                    </section>
+                  )}
                   {diagnosis.aiAdvice && (
                     <AiAdviceSection advice={diagnosis.aiAdvice} />
                   )}
@@ -189,6 +200,7 @@ export default function ResultPage({ params }: ResultPageProps) {
                       <ColorPalette colors={diagnosis.colorPalette} />
                     </div>
                   </section>
+                  <StyleImageCard diagnosis={diagnosis} />
                   <section className="glass-card rounded-[20px] p-6">
                     <h2 className="text-xl font-bold text-[#181698]">风格建议</h2>
                     <p className="mt-4 leading-8 text-[#667694]">{diagnosis.aiDescription}</p>

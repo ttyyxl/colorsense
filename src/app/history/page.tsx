@@ -13,6 +13,7 @@ import { listUserDiagnoses } from "@/lib/firestore-diagnoses";
 import { SEASONS } from "@/lib/seasons";
 import type { Diagnosis } from "@/lib/types";
 import type { OutfitHistoryRecord, OutfitHistorySummary } from "@/lib/outfit-types";
+import { resolveDiagnosisStatusOf } from "@/lib/diagnosis-status";
 import { useAuth } from "@/lib/useAuth";
 
 const SCORE_LABELS = {
@@ -890,6 +891,12 @@ export default function HistoryPage() {
                   const season = SEASONS[diagnosis.seasonType];
                   const isDeleting = deletingDiagnosisId === diagnosis.id;
                   const isSelected = selectedDiagnosisIds.has(diagnosis.id);
+                  // Phase 3.3：历史记录不因低置信度而隐藏，但在卡片上明确标注可靠性状态。
+                  const recordStatus = resolveDiagnosisStatusOf({
+                    diagnosisStatus: diagnosis.diagnosisStatus,
+                    fusionDiagnosis: diagnosis.fusionDiagnosis,
+                  });
+                  const isUncertain = recordStatus === "UNCERTAIN" || recordStatus === "DEGRADED";
 
                   return (
                     <article
@@ -928,6 +935,11 @@ export default function HistoryPage() {
                             <h2 className="mt-1 text-2xl font-bold text-slate-950">
                               {season.emoji} {season.name}
                             </h2>
+                            {isUncertain && (
+                              <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                {recordStatus === "UNCERTAIN" ? "结果存在不确定性" : "仅单一模型分析"}，可参考使用
+                              </p>
+                            )}
                           </div>
                         </div>
                         <span className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700">{Math.round(diagnosis.confidence * 100)}%</span>

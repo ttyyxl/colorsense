@@ -9,12 +9,15 @@ test("CONFIDENT shows formal season and downstream actions", () => {
   assert.equal(presentation.showRetake, false);
 });
 
-test("UNCERTAIN shows candidates but no formal season or OOTD", () => {
+test("UNCERTAIN still shows formal season and downstream actions with an uncertainty note", () => {
+  // Phase 3.3：诊断可信程度与业务可执行性解耦——低置信度不再阻断展示与后续建议。
   const presentation = presentationForStatus("UNCERTAIN");
-  assert.equal(presentation.showFormalSeason, false);
+  assert.equal(presentation.showFormalSeason, true);
   assert.equal(presentation.showCandidates, true);
   assert.equal(presentation.showRetake, true);
-  assert.equal(presentation.showDownstreamActions, false);
+  assert.equal(presentation.showDownstreamActions, true);
+  assert.equal(presentation.carriesUncertainty, true);
+  assert.match(presentation.description, /不确定性/);
 });
 
 test("RETAKE_REQUIRED shows neither formal season nor candidates", () => {
@@ -22,18 +25,23 @@ test("RETAKE_REQUIRED shows neither formal season nor candidates", () => {
   assert.equal(presentation.showFormalSeason, false);
   assert.equal(presentation.showCandidates, false);
   assert.equal(presentation.showRetake, true);
+  assert.equal(presentation.showDownstreamActions, false);
 });
 
-test("DEGRADED shows candidates with limitations", () => {
+test("DEGRADED still shows formal season and downstream actions with limitations", () => {
+  // Phase 3.3：单模型降级同样允许展示季型并生成后续建议。
   const presentation = presentationForStatus("DEGRADED");
+  assert.equal(presentation.showFormalSeason, true);
   assert.equal(presentation.showCandidates, true);
-  assert.equal(presentation.showDownstreamActions, false);
+  assert.equal(presentation.showDownstreamActions, true);
+  assert.equal(presentation.carriesUncertainty, true);
 });
 
 test("FAILED hides season and offers retry", () => {
   const presentation = presentationForStatus("FAILED");
   assert.equal(presentation.showFormalSeason, false);
   assert.equal(presentation.showRetake, true);
+  assert.equal(presentation.showDownstreamActions, false);
 });
 
 test("legacy records without status default to CONFIDENT", () => {
