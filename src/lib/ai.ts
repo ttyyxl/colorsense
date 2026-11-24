@@ -6,7 +6,7 @@ import { UserStyleProfilePromptContext } from "./user-profile-types";
 // 密钥只能来自服务端环境变量；未配置时走既有 fallback，不记录密钥内容。
 const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY ?? "";
 const DOUBAO_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const DOUBAO_MODEL = "doubao-seed-2-0-pro-260215";
+const DOUBAO_MODEL = "deepseek-v4-1-flash-261017";
 
 function getDoubaoClient(): OpenAI | null {
   if (!DOUBAO_API_KEY) {
