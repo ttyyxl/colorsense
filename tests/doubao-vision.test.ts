@@ -87,8 +87,34 @@ test("successful mocked call returns validated result and call metadata", async 
   }
 });
 
-test("missing API key / model id returns a configuration error", () => {
-  assert.throws(
+test("model refusal (can_judge_reliably=false) is a successful response and is never retried", async () => {
+  let calls = 0;
+  const refusalContent = JSON.stringify({
+    ...validObject,
+    can_judge_reliably: false,
+    lighting_warning: true,
+    filter_warning: true,
+    reason: "照片经过明显的色彩处理，无法据此可靠判断季节型。",
+  });
+  const result = await silent(() =>
+    analyzeSeasonWithDoubao(pngBuffer, "image/png", {
+      config: testConfig,
+      completionFn: async () => {
+        calls += 1;
+        return { content: refusalContent, usage: null };
+      },
+    }),
+  );
+
+  // 主动拒判是合法结构化响应：正常返回、不抛错、不触发任何重试。
+  assert.equal(calls, 1);
+  assert.equal(result.meta.attempts, 1);
+  assert.equal(result.result.can_judge_reliably, false);
+  assert.equal(result.result.lighting_warning, true);
+  assert.equal(result.result.filter_warning, true);
+});
+
+test("missing API key / model id returns a configuration error", () => {  assert.throws(
     () => readVisionConfigFromEnv({}),
     (error: unknown) => error instanceof VisionError && error.code === "CONFIG_MISSING",
   );

@@ -23,14 +23,21 @@ export async function GET() {
   const diagnoses = snapshot.docs
     .map((doc) => {
       const data = doc.data();
+      const fusion = data.fusionDiagnosis as Record<string, unknown> | undefined;
+      // 历史记录没有 v2 状态字段：按 CONFIDENT 处理以保持用户已有画像可访问，
+      // 但这些记录未经第三阶段的图像质量与不确定性判断，不代表已通过新版规则校验。
+      const status = typeof fusion?.diagnosisStatus === "string" ? fusion.diagnosisStatus : "CONFIDENT";
       return {
         id: doc.id,
         seasonType: data.seasonType ?? null,
         confidence: typeof data.confidence === "number" ? data.confidence : null,
         source: data.source ?? null,
+        diagnosisStatus: status,
         createdAt: toIsoString(data.createdAt),
       };
     })
+    // 画像与穿搭推荐只采用正式诊断结果；UNCERTAIN/DEGRADED/RETAKE/FAILED 不覆盖已有画像。
+    .filter((item) => item.diagnosisStatus === "CONFIDENT")
     .sort((left, right) => getTime(right.createdAt) - getTime(left.createdAt));
 
   return NextResponse.json({

@@ -8,6 +8,11 @@ import {
 } from "./fusion.ts";
 import type { SeasonKey, SeasonScores } from "./vision-schema.ts";
 import { logVisionDiagnostics } from "./vision-diagnostics.ts";
+import {
+  buildAdvancedDiagnosis,
+  type AdvancedDiagnosisInput,
+} from "./advanced-diagnosis.ts";
+import type { AdvancedFusionDiagnosis, DiagnosisRiskEntry } from "./diagnosis-types.ts";
 
 /**
  * /api/diagnose 与综合结果之间的纯适配层。
@@ -75,12 +80,84 @@ export function assembleDiagnosisFields(input: AssembleDiagnosisInput): Assemble
   };
 }
 
+export interface AssembleAdvancedInput extends AdvancedDiagnosisInput {
+  /** 预留开关一致性；v2 组装本身只在融合启用时由调用方触发。 */
+  fusionEnabled: boolean;
+  /** 旧字段兜底：仅 fusion 不可用时（RETAKE/FAILED）不会写入。 */
+  legacy: LegacySeasonFields;
+}
+
+export interface AssembledAdvancedFields {
+  /** blocked 时不存在任何正式季型字段，前端不得展示确定性结论。 */
+  blocked: boolean;
+  diagnosisStatus: AdvancedFusionDiagnosis["diagnosisStatus"];
+  inferenceMode: AdvancedFusionDiagnosis["inferenceMode"];
+  uncertaintyReasons: string[];
+  /** 风险分层明细（Phase 3.2）。 */
+  risks: DiagnosisRiskEntry[];
+  /** 决定性风险原因。 */
+  decisiveReasons: string[];
+  /** 仅软警告（不阻止正式诊断，但仍需展示）。 */
+  softWarnings: string[];
+  recommendations: string[];
+  seasonType?: SeasonKey;
+  confidence?: number;
+  scores?: SeasonScores;
+  fusionDiagnosis?: AdvancedFusionDiagnosis;
+}
+
+/**
+ * 第三阶段 v2 适配：v1 顶层字段在可诊断时与融合结果同源；
+ * RETAKE_REQUIRED / FAILED 时不产生 seasonType/confidence/scores，杜绝虚假结论。
+ */
+export function assembleAdvancedDiagnosisFields(input: AssembleAdvancedInput): AssembledAdvancedFields {
+  const result = buildAdvancedDiagnosis(input);
+  logVisionDiagnostics("fusion.result", {
+    fusionEnabled: true,
+    cnnWeight: input.cnnWeight ?? 0.4,
+    source: result.fusion?.source,
+    fallbackReason: result.fusion?.fallbackReason ?? result.blockedCode ?? null,
+  });
+
+  if (!result.fusion) {
+    return {
+      blocked: true,
+      diagnosisStatus: result.diagnosisStatus,
+      inferenceMode: result.inferenceMode,
+      uncertaintyReasons: result.uncertaintyReasons,
+      risks: result.risks,
+      decisiveReasons: result.decisiveReasons,
+      softWarnings: result.softWarnings,
+      recommendations: result.recommendations,
+    };
+  }
+
+  const fusion = result.fusion;
+  return {
+    blocked: false,
+    diagnosisStatus: result.diagnosisStatus,
+    inferenceMode: result.inferenceMode,
+    uncertaintyReasons: result.uncertaintyReasons,
+    risks: result.risks,
+    decisiveReasons: result.decisiveReasons,
+    softWarnings: result.softWarnings,
+    recommendations: result.recommendations,
+    seasonType: fusion.predictedSeason,
+    confidence: fusion.seasonScores[fusion.predictedSeason],
+    scores: fusion.seasonScores,
+    fusionDiagnosis: fusion,
+  };
+}
+
 /** 构造 Firestore 记录；可选字段缺失时不写入 undefined，历史字段保持不变。 */
-export function buildDiagnosisRecord<T extends Record<string, unknown>>(
-  fields: AssembledDiagnosisFields,
+export function buildDiagnosisRecord<F extends object, T extends Record<string, unknown>>(
+  fields: F,
   extras: T,
 ) {
-  const { scores, fusionDiagnosis, ...requiredFields } = fields;
+  const { scores, fusionDiagnosis, ...requiredFields } = fields as F & {
+    scores?: unknown;
+    fusionDiagnosis?: unknown;
+  };
   return {
     ...requiredFields,
     ...(scores === undefined ? {} : { scores }),

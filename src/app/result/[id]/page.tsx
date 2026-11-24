@@ -15,6 +15,9 @@ import { useAuth } from "@/lib/useAuth";
 import { useEffect, useRef, useState } from "react";
 import { FooterGradient } from "@/components/home/FooterGradient"; // Import FooterGradient
 import { motion } from "framer-motion"; // Import motion
+import { DiagnosisStatusNotice } from "@/components/DiagnosisStatusNotice";
+import { presentationForStatus, splitReasons } from "@/lib/diagnosis-status-ui";
+import { isAdvancedFusionDiagnosis } from "@/lib/diagnosis-types";
 
 const springTransition = { type: "spring", stiffness: 140, damping: 20 } as const; // Define springTransition
 const resultActionCardClassName =
@@ -37,10 +40,21 @@ export default function ResultPage({ params }: ResultPageProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [error, setError] = useState("");
-  const season = diagnosis ? SEASONS[diagnosis.seasonType] : null;
+  const fusion = diagnosis?.fusionDiagnosis;
+  const advancedFusion = fusion && isAdvancedFusionDiagnosis(fusion) ? fusion : null;
+  const hasV2Diagnosis = advancedFusion !== null;
+  const diagnosisStatus = advancedFusion ? advancedFusion.diagnosisStatus : "CONFIDENT";
+  const presentation = presentationForStatus(diagnosisStatus);
+  const season = diagnosis && presentation.showFormalSeason ? SEASONS[diagnosis.seasonType] : null;
+  const uncertaintyReasons = advancedFusion ? advancedFusion.uncertaintyReasons : [];
+  const risks = advancedFusion ? advancedFusion.risks ?? [] : [];
+  // 决定性原因与普通软警告分开展示；软警告不阻止正式季型展示。
+  const { decisive: decisiveReasons, soft: softWarnings } = splitReasons(uncertaintyReasons, risks);
+  const recommendations = advancedFusion ? advancedFusion.recommendations : [];
+  const candidates = advancedFusion ? advancedFusion.candidateSeasons : [];
   const hasUnreliableFaceQuality = diagnosis?.faceDetected === false || diagnosis?.usedOriginalImage === true;
-  const hasVerifiedModelAnalysis =
-    diagnosis?.source === "model" && diagnosis.faceDetected === true && diagnosis.usedOriginalImage === false;
+  // 历史记录（无 v2 状态字段）保持可展示，但明确标注其未经新版可靠性判断。
+  const isLegacyRecord = Boolean(diagnosis) && !hasV2Diagnosis;
 
   useEffect(() => {
     let ignore = false;
@@ -96,7 +110,27 @@ export default function ResultPage({ params }: ResultPageProps) {
               </div>
             )}
 
-            {!error && !season && <div className="mt-6 rounded-2xl border border-indigo-100 bg-white p-6 text-slate-600">正在读取诊断结果...</div>}
+            {!error && !diagnosis && <div className="mt-6 rounded-2xl border border-indigo-100 bg-white p-6 text-slate-600">正在读取诊断结果...</div>}
+
+            {diagnosis && (
+              <DiagnosisStatusNotice
+                status={diagnosisStatus}
+                reasons={decisiveReasons}
+                softWarnings={softWarnings}
+                recommendations={recommendations}
+                candidates={candidates}
+              />
+            )}
+
+            {isLegacyRecord && (
+              <section className="rounded-[20px] border border-slate-200 bg-slate-50 p-5 text-slate-700">
+                <p className="font-semibold">历史诊断记录</p>
+                <p className="mt-2 leading-7">
+                  该记录生成于可靠性判断机制上线之前，未经过图像质量评估、双模型一致性与不确定性判断，
+                  因此不代表已通过新版诊断规则校验的正式结论。
+                </p>
+              </section>
+            )}
 
             {diagnosis && season && (
               <>
@@ -173,9 +207,11 @@ export default function ResultPage({ params }: ResultPageProps) {
                   )}
                 </div>
                 <div className="mt-6 grid justify-center gap-3 sm:grid-cols-2 lg:grid-cols-4"> {/* Adjusted grid for better responsiveness */}
-                  <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.05 }}>
-                    <ShareModal diagnosisId={id} cardRef={cardRef} />
-                  </motion.div>
+                  {presentation.showDownstreamActions && (
+                    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.05 }}>
+                      <ShareModal diagnosisId={id} cardRef={cardRef} />
+                    </motion.div>
+                  )}
                   <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.1 }}>
                     <Link href="/upload" className={resultActionCardClassName}>
                       重新诊断
@@ -186,11 +222,13 @@ export default function ResultPage({ params }: ResultPageProps) {
                       查看历史
                     </Link>
                   </motion.div>
-                  <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.2 }}>
-                    <Link href="/outfit" className={resultActionCardClassName}>
-                      生成今日 OOTD
-                    </Link>
-                  </motion.div>
+                  {presentation.showDownstreamActions && (
+                    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springTransition, delay: 0.2 }}>
+                      <Link href="/outfit" className={resultActionCardClassName}>
+                        生成今日 OOTD
+                      </Link>
+                    </motion.div>
+                  )}
                 </div>
               </>
             )}
