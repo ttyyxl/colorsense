@@ -218,8 +218,7 @@ export function StyleImageCard({ diagnosis }: StyleImageCardProps) {
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">第三方照片处理说明</p>
           <p className="mt-2 leading-6">
-            生成图卡时，你上传的原始照片将被发送至第三方 AI 服务（火山方舟 / 豆包）用于图生图处理。
-            照片只用于本次生成，不会在本项目数据库中保存；参考图仅暂存在当前浏览器，可通过清除站点数据删除。
+           生成图卡时，你上传的照片将发送至第三方 AI 服务，仅用于本次形象预览，本平台不会长期保存你的原始照片。
           </p>
           <label className="mt-3 flex items-start gap-2 text-sm">
             <input

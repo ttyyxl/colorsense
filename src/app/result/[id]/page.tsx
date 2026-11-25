@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { FooterGradient } from "@/components/home/FooterGradient"; // Import FooterGradient
 import { motion } from "framer-motion"; // Import motion
 import { DiagnosisStatusNotice } from "@/components/DiagnosisStatusNotice";
-import { presentationForStatus, splitReasons } from "@/lib/diagnosis-status-ui";
+import { presentationForStatus, resolveSeasonScoreView, splitReasons } from "@/lib/diagnosis-status-ui";
 import { isAdvancedFusionDiagnosis } from "@/lib/diagnosis-types";
 import { resolveDiagnosisStatusOf } from "@/lib/diagnosis-status";
 
@@ -55,6 +55,9 @@ export default function ResultPage({ params }: ResultPageProps) {
   const recommendations = advancedFusion?.recommendations ?? diagnosis?.recommendations ?? [];
   const candidates = advancedFusion ? advancedFusion.candidateSeasons : [];
   const hasUnreliableFaceQuality = diagnosis?.faceDetected === false || diagnosis?.usedOriginalImage === true;
+  // 四季综合匹配度：双模型融合成功时直接读取后端融合评分；
+  // 融合未启用或单模型降级时使用实际有效的最终诊断评分并如实标注来源。
+  const seasonScoreView = diagnosis ? resolveSeasonScoreView(diagnosis) : null;
   // 历史记录（无 v2 状态字段）保持可展示，但明确标注其未经新版可靠性判断。
   const isLegacyRecord = Boolean(diagnosis) && !hasV2Diagnosis;
 
@@ -114,7 +117,10 @@ export default function ResultPage({ params }: ResultPageProps) {
 
             {!error && !diagnosis && <div className="mt-6 rounded-2xl border border-indigo-100 bg-white p-6 text-slate-600">正在读取诊断结果...</div>}
 
-            {diagnosis && (
+            {diagnosis && !season && (
+              // 仅在无法给出有效季型结果（RETAKE_REQUIRED / FAILED 等硬阻断状态）时
+              // 展示必要的错误/重拍提示；成功获得有效季型结果的记录不再展示
+              // 冗余的不确定性卡片（UNCERTAIN / DEGRADED 不阻断业务流程）。
               <DiagnosisStatusNotice
                 status={diagnosisStatus}
                 reasons={decisiveReasons}
@@ -156,36 +162,39 @@ export default function ResultPage({ params }: ResultPageProps) {
                     </section>
                   )}
                   <SeasonCard season={season} confidence={diagnosis.confidence} />
-                  {/* Phase 3.3：低置信度结果同样展示季型，但必须在结论旁明确提示不确定性。 */}
-                  {presentation.carriesUncertainty && (
-                    <section className="rounded-[20px] border border-amber-300 bg-amber-50 p-5 text-amber-900">
-                      <p className="font-semibold">本次季型结论存在不确定性</p>
-                      <p className="mt-2 leading-7">
-                        当前诊断状态为「{diagnosisStatus}」。本次结果仍可用于配色与穿搭参考，
-                        但准确度低于常规诊断；建议按下方改善建议优化照片后复诊，以获得更稳定的季型判断。
-                      </p>
-                    </section>
-                  )}
                   {diagnosis.aiAdvice && (
                     <AiAdviceSection advice={diagnosis.aiAdvice} />
                   )}
 
 
-                  {diagnosis.scores && (
+                  {seasonScoreView && (
                     <section className="glass-card rounded-[20px] p-6">
-                      <h2 className="text-xl font-bold text-[#181698]">四季分类置信分数</h2>
+                      <h2 className="text-xl font-bold text-[#181698]">四季综合匹配度</h2>
+                      <p className="mt-2 text-sm text-[#667694]">{seasonScoreView.sourceLabel}</p>
                       <div className="mt-5 space-y-4">
                         {Object.entries(SCORE_LABELS).map(([key, label]) => {
-                          const score = diagnosis.scores?.[key as keyof typeof SCORE_LABELS] ?? 0;
+                          const score = seasonScoreView.scores[key as keyof typeof SCORE_LABELS];
+                          // 历史记录可能缺少某个季型的评分：缺失时不伪造，直接跳过该季型。
+                          if (score === undefined) return null;
+                          const isTopSeason = seasonScoreView.topSeason === key;
                           return (
                             <div key={key}>
                               <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-                                <span className="font-semibold text-slate-700">{label}</span>
-                                <span className="text-slate-500">{Math.round(score * 100)}%</span>
+                                <span className={`flex items-center gap-2 ${isTopSeason ? "font-bold text-[#181698]" : "font-semibold text-slate-700"}`}>
+                                  {label}
+                                  {isTopSeason && (
+                                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                      最终季型
+                                    </span>
+                                  )}
+                                </span>
+                                <span className={isTopSeason ? "font-bold text-[#181698]" : "text-slate-500"}>
+                                  {(score * 100).toFixed(2)}%
+                                </span>
                               </div>
                               <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                  className="h-full rounded-full bg-indigo-500"
+                                  className={`h-full rounded-full ${isTopSeason ? "bg-indigo-600" : "bg-indigo-300"}`}
                                   style={{ width: `${Math.max(0, Math.min(score, 1)) * 100}%` }}
                                 />
                               </div>
@@ -193,6 +202,11 @@ export default function ResultPage({ params }: ResultPageProps) {
                           );
                         })}
                       </div>
+                      {seasonScoreView.weightLabel && (
+                        <p className="mt-5 text-sm text-[#667694]">
+                          实际生效权重：{seasonScoreView.weightLabel}
+                        </p>
+                      )}
                     </section>
                   )}
                   <section className="glass-card rounded-[20px] p-6">
