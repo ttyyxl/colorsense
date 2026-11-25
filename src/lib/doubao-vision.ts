@@ -11,6 +11,7 @@ import {
   type VisionResult,
 } from "./vision-schema.ts";
 import { logVisionDiagnostics } from "./vision-diagnostics.ts";
+import { SEASONS, type SeasonType } from "./seasons.ts";
 
 /**
  * Doubao-Seed-2.0-Lite 多模态视觉诊断服务（独立于正式诊断链路）。
@@ -735,6 +736,19 @@ export interface AnalyzeVisionOptions {
   sleep?: (ms: number) => Promise<void>;
   /** 覆盖输出 token 预算，便于实验；默认 VISION_DEFAULTS.maxCompletionTokens。 */
   maxCompletionTokens?: number;
+  /** 用户色卡自测得到的候选季型，作为弱先验写进提示词，不改变以照片为准的原则。 */
+  seasonHints?: SeasonType[];
+}
+
+/** 把用户自测结果转成提示词片段；没有自测结果时返回空字符串。 */
+function buildSeasonHintText(seasonHints?: SeasonType[]): string {
+  if (!seasonHints || seasonHints.length === 0) return "";
+  const names = Array.from(new Set(seasonHints)).map((season) => SEASONS[season].name);
+  return (
+    `\n\n用户补充信息（弱先验）：用户此前用色卡自测，认为自己的季型可能是「${names.join("」「")}」。` +
+    "这只是用户的主观感受，仅供参考；请仍以照片中可观察到的肤色冷暖、明度、饱和度与五官对比度作为主要依据。" +
+    "如果照片特征与自测不一致，请以照片为准，并在 reason 中简要说明差异。"
+  );
 }
 
 const SCHEMA_FORMAT: VisionResponseFormat = {
@@ -857,7 +871,7 @@ export async function analyzeSeasonWithDoubao(
       {
         role: "user",
         content: [
-          { type: "text", text: DOUBAO_VISION_USER_INSTRUCTION },
+          { type: "text", text: DOUBAO_VISION_USER_INSTRUCTION + buildSeasonHintText(options.seasonHints) },
           {
             type: "image_url",
             image_url: { url: prepared.dataUrl, detail: "auto" },

@@ -87,6 +87,28 @@ test("successful mocked call returns validated result and call metadata", async 
   }
 });
 
+test("season hints from color card self-test are appended as a weak prior", async () => {
+  let captured: VisionCompletionRequest | undefined;
+  await silent(() =>
+    analyzeSeasonWithDoubao(pngBuffer, "image/png", {
+      config: testConfig,
+      seasonHints: ["spring", "autumn"],
+      completionFn: async (request) => {
+        captured = request;
+        return { content: validContent, usage: null };
+      },
+    }),
+  );
+
+  const userParts = captured?.messages[1];
+  assert.ok(userParts && userParts.role === "user");
+  const textPart = userParts.content.find((part) => part.type === "text");
+  assert.ok(textPart && textPart.type === "text");
+  assert.ok(textPart.text.includes("弱先验"));
+  assert.ok(textPart.text.includes("「春型」「秋型」"));
+  assert.ok(textPart.text.includes("以照片为准"));
+});
+
 test("model refusal (can_judge_reliably=false) is a successful response and is never retried", async () => {
   let calls = 0;
   const refusalContent = JSON.stringify({

@@ -387,6 +387,9 @@ test("提示词包含六种颜色与单色约束", () => {
   assert.ok(prompt.includes("第6张"));
   assert.ok(prompt.includes("单一纯色") || prompt.includes("一种纯色"));
   assert.ok(prompt.includes("春日清新"));
+  // 图卡下方色卡标签必须使用中文颜色名。
+  assert.ok(prompt.includes("简体中文"));
+  assert.ok(prompt.includes("「浅红色系」") || prompt.includes("「中红色系」"));
 });
 
 /* ------------------------------------------------------------------ */

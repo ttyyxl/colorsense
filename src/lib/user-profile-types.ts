@@ -1,4 +1,5 @@
 import { ProfileOutput } from "@/lib/ai";
+import type { ColorCardTestResult } from "./color-card";
 
 export interface UserQuestionnaireRequiredInfo {
   gender?: string;
@@ -60,6 +61,7 @@ export interface UserStyleProfile {
   aiPromptReady: boolean;
   promptContext: UserStyleProfilePromptContext;
   generatedProfileAdvice?: ProfileOutput; // Add this line
+  colorCardTest?: ColorCardTestResult;
   createdAt?: unknown;
   updatedAt?: unknown;
 }

@@ -9,6 +9,7 @@ import { ProfileSummary } from "@/components/profile/ProfileSummary";
 import { getAuthToken } from "@/lib/client/api";
 import { useAuth } from "@/lib/useAuth";
 import type { UserStyleProfile } from "@/lib/user-profile-types";
+import { COLOR_CARDS, SEASON_LABELS, describeColorCardSeasons } from "@/lib/color-card";
 
 interface LatestDiagnosis {
   id: string;
@@ -95,7 +96,7 @@ function PortraitProfileContent() {
             <p className="text-sm font-semibold text-indigo-700">个人肖像档案</p>
             <h1 className="mt-2 text-3xl font-bold text-slate-950">查看你的个人画像信息</h1>
             <p className="mt-4 leading-7 text-slate-600">
-              问卷结果和最近一次季型诊断可在本页查看，修改个人问卷信息可点击修改问卷重新填写。
+              问卷结果、色卡自测和最近一次季型诊断可在本页查看，修改个人问卷信息可点击修改问卷重新填写。
             </p>
           </div>
           {profile && (
@@ -130,6 +131,7 @@ function PortraitProfileContent() {
             <>
               <ProfileSummary profile={profile} />
               <LatestDiagnosisCard diagnosis={latestDiagnosis} />
+              <ColorCardTestCard result={profile.colorCardTest} />
             </>
           )}
         </div>
@@ -177,6 +179,50 @@ function LatestDiagnosisCard({ diagnosis }: { diagnosis: LatestDiagnosis | null 
         <InfoItem label="季型" value={diagnosis.seasonType ?? "未识别"} />
         <InfoItem label="置信度" value={diagnosis.confidence === null ? "未记录" : `${Math.round(diagnosis.confidence * 100)}%`} />
         <InfoItem label="诊断时间" value={formatDate(diagnosis.createdAt)} />
+      </div>
+    </section>
+  );
+}
+
+function ColorCardTestCard({ result }: { result: UserStyleProfile["colorCardTest"] }) {
+  if (!result || result.selections.length === 0) {
+    return (
+      <section className="rounded-2xl border border-dashed border-indigo-200 bg-white p-6 text-slate-600">
+        <h2 className="text-lg font-bold text-slate-950">色卡自测</h2>
+        <p className="mt-3 leading-7">还没有保存色卡自测结果。完成个人形象问卷后，可以用四张色卡对比人脸并保存自测季型。</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-bold text-slate-950">色卡自测</h2>
+        <p className="text-xs text-slate-500">保存于 {formatDate(result.completedAt)}</p>
+      </div>
+      <p className="mt-3 leading-7 text-slate-600">
+        你的色卡选择表示你为{" "}
+        <span className="font-semibold text-indigo-700">{describeColorCardSeasons(result.seasons)}</span>。
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {result.selections.map((selection, index) => {
+          const card = COLOR_CARDS.find((item) => item.id === selection.cardId);
+          return (
+            <div key={selection.cardId} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <span
+                className="h-9 w-9 shrink-0 rounded-full ring-1 ring-slate-200"
+                style={{ backgroundColor: card?.colors[selection.season] }}
+                aria-hidden="true"
+              />
+              <div>
+                <p className="text-xs text-slate-500">
+                  色卡 {index + 1} · {card?.name ?? selection.cardId}
+                </p>
+                <p className="text-sm font-semibold text-slate-800">{SEASON_LABELS[selection.season]}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

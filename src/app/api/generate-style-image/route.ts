@@ -102,10 +102,10 @@ function consumeQuota(uid: string, now: number): boolean {
 /* ------------------------------------------------------------------ */
 
 /**
- * 把 hex 色值转换成更贴近自然语言的颜色描述，便于文生图模型理解。
- * 同时保留 hex 让模型尽量还原精确色值。
+ * 把 hex 色值转换成简短的中文颜色名称，用于图卡下方标签。
+ * 例如 #6FA8C9 → “中青色系”，#B9B9B9 → “中灰色调”。
  */
-function describeHex(hex: string): string {
+function colorLabel(hex: string): string {
   const h = hex.replace("#", "").trim();
   if (h.length !== 6) return hex;
   const r = parseInt(h.slice(0, 2), 16);
@@ -125,9 +125,15 @@ function describeHex(hex: string): string {
     if (hue < 0) hue += 360;
   }
 
+  const tone = l > 0.7 ? "浅" : l < 0.35 ? "深" : "中";
+  if (s < 0.12) {
+    if (l > 0.85) return "纯白色";
+    if (l < 0.15) return "纯黑色";
+    return `${tone}灰色调`;
+  }
+
   let family = "中性色";
-  if (s < 0.12) family = l > 0.85 ? "纯白色" : l < 0.15 ? "纯黑色" : "灰色调";
-  else if (hue < 15 || hue >= 345) family = "红色系";
+  if (hue < 15 || hue >= 345) family = "红色系";
   else if (hue < 45) family = "橙色系";
   else if (hue < 70) family = "黄色系";
   else if (hue < 160) family = "绿色系";
@@ -136,8 +142,15 @@ function describeHex(hex: string): string {
   else if (hue < 300) family = "紫色系";
   else family = "玫红色系";
 
-  const tone = l > 0.7 ? "浅" : l < 0.35 ? "深" : "中";
-  return `${tone}${family}（色值 ${hex}）`;
+  return `${tone}${family}`;
+}
+
+/**
+ * 把 hex 色值转换成更贴近自然语言的颜色描述，便于文生图模型理解。
+ * 同时保留 hex 让模型尽量还原精确色值。
+ */
+function describeHex(hex: string): string {
+  return `${colorLabel(hex)}（色值 ${hex}）`;
 }
 
 /**
@@ -180,6 +193,7 @@ function buildPrompt(
     palette.push(palette[palette.length - 1] || "#C0C0C0");
   }
 
+  const labels = palette.map((color) => colorLabel(color));
   const colorList = palette
     .map((c, i) => `第${i + 1}张：${describeHex(c)}纯色上衣`)
     .join("；");
@@ -192,7 +206,8 @@ function buildPrompt(
     `${colorList}。每张均为同色圆领内搭外搭同色西装外套，内外同色。`,
     "严格要求：整套服装只使用一种纯色，禁止图案、印花、logo、字母、条纹、格纹、波点、拼接、撞色、渐变或第二种颜色；除肤色、发色、浅灰背景与该套纯色服装外不得出现其他颜色。",
     "纯净浅灰影棚背景，柔和均匀自然光，专业肖像摄影，杂志大片质感，干净高级极简。",
-    "左上角标题「服装颜色模拟」，右上角小字「DIFFERENT COLORS / DIFFERENT VIBES」，每张肖像下方有对应颜色的小圆点色卡与名称标签。宽高比16:9。",
+    "左上角标题「服装颜色模拟」，右上角小字「DIFFERENT COLORS / DIFFERENT VIBES」。每张肖像下方有白色标签条：左侧一个小圆点（与该套服装同色），右侧用简体中文标注对应颜色名称，从左到右依次为" +
+      `「${labels.join("」「")}」。中文名称必须清晰可读，不得写成英文颜色名，不得出现乱码或错字。宽高比16:9。`,
   ];
 
   if (hasImage) {

@@ -168,9 +168,12 @@ export async function POST(request: Request) {
     const shouldCallDoubao = fusionConfig.enabled && doubaoUnavailableCode === undefined;
 
     // 5. 并行执行 CNN 推理与 Doubao 视觉诊断：一个模型失败不会丢弃另一个的有效结果。
+    // 用户色卡自测结果只作为视觉诊断的弱先验，读取失败时不影响诊断主流程。
+    const userProfile = await getUserProfile(user.uid).catch(() => null);
+    const seasonHints = userProfile?.colorCardTest?.seasons;
     const cnnTask = runInference(image);
     const doubaoTask: Promise<VisionAnalysisResult | null> = shouldCallDoubao
-      ? (async () => analyzeSeasonWithDoubao(imageBytes, image.type))()
+      ? (async () => analyzeSeasonWithDoubao(imageBytes, image.type, { seasonHints }))()
       : Promise.resolve(null);
     const [cnnSettled, doubaoSettled] = await Promise.allSettled([cnnTask, doubaoTask]);
 
@@ -311,8 +314,7 @@ export async function POST(request: Request) {
     // 个性化建议；UNCERTAIN / DEGRADED 会在结果与建议中明确提示不确定性。
     const hasValidSeasonResult = isExecutableDiagnosisStatus(diagnosisStatus);
 
-    // 10. 获取用户画像
-    const userProfile = await getUserProfile(user.uid);
+    // 10. 用户画像已在视觉诊断前读取，这里直接复用。
     const userProfileContext = userProfile ? buildUserProfilePromptContext(userProfile) : undefined;
 
     // 11. 风格建议：只要存在有效季型结果就生成个性化建议。

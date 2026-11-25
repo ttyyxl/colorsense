@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { FormEvent, useEffect, useState } from "react";
 import Sketch from "@uiw/react-color-sketch";
@@ -8,6 +7,7 @@ import { hsvaToHslaString } from "@uiw/color-convert";
 import { getCloudBaseAuth } from "@/lib/cloudbase";
 import { getAuthToken } from "@/lib/client/api";
 import type { UserStyleProfile, UserStyleProfileInput } from "@/lib/user-profile-types";
+import { ColorCardTest } from "./ColorCardTest";
 
 const GENDER_OPTIONS = ["女性", "男性", "非二元", "其他"];
 const AGE_RANGE_OPTIONS = ["18 岁以下", "18-24", "25-34", "35-44", "45-54", "55 岁以上"];
@@ -175,11 +175,11 @@ function isRequiredComplete(profile: UserStyleProfileInput) {
 }
 
 export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形象问卷", onSaved }: StyleProfileFormProps) {
-  const router = useRouter();
   const [profile, setProfile] = useState<UserStyleProfileInput>(EMPTY_PROFILE);
   const [accountEmail, setAccountEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showColorCardTest, setShowColorCardTest] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -265,7 +265,8 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
       setNotice({ type: "success", text: "个人形象问卷已保存。" });
       onSaved?.();
       if (redirectPath) {
-        router.push(redirectPath);
+        setShowColorCardTest(true);
+        return;
       }
     } catch {
       setNotice({ type: "error", text: "保存失败，请检查网络或稍后重试。" });
@@ -276,6 +277,10 @@ export function StyleProfileForm({ redirectPath, submitLabel = "保存个人形�
 
   if (loading) {
     return <div className="rounded-2xl border border-indigo-100 bg-white/76 p-6 text-slate-600 shadow-sm">正在读取个人形象问卷...</div>;
+  }
+
+  if (showColorCardTest) {
+    return <ColorCardTest redirectPath={redirectPath} />;
   }
 
   return (

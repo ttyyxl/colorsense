@@ -18,7 +18,7 @@ export default function OnboardingStyleProfilePage() {
             </p>
           </div>
           <div className="relative mt-8">
-            <StyleProfileForm redirectPath="/upload" submitLabel="保存并开始诊断" />
+            <StyleProfileForm redirectPath="/upload" submitLabel="保存" />
           </div>
         </section>
         <FooterGradient />

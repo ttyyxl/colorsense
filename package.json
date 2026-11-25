@@ -15,7 +15,7 @@
     "test:diagnostics:unit": "node --import tsx --test tests/vision-diagnostics.test.ts",
     "test:advanced:unit": "node --import tsx --test tests/advanced-diagnosis.test.ts tests/diagnose-flow.test.ts tests/diagnosis-status-ui.test.ts tests/phase3.3-decision.test.ts",
     "test:style-image:unit": "node --import tsx --test tests/generate-style-image.test.ts tests/uploaded-image.test.ts",
-    "test:offline": "node --import tsx --test tests/vision-schema.test.ts tests/doubao-vision.test.ts tests/doubao-orientation.test.ts tests/fusion.test.ts tests/fusion-diagnose.test.ts tests/pg-diagnoses.test.ts tests/vision-diagnostics.test.ts tests/advanced-diagnosis.test.ts tests/diagnose-flow.test.ts tests/diagnosis-status-ui.test.ts tests/phase3.3-decision.test.ts tests/generate-style-image.test.ts tests/uploaded-image.test.ts",
+    "test:offline": "node --import tsx --test tests/vision-schema.test.ts tests/doubao-vision.test.ts tests/doubao-orientation.test.ts tests/fusion.test.ts tests/fusion-diagnose.test.ts tests/pg-diagnoses.test.ts tests/vision-diagnostics.test.ts tests/advanced-diagnosis.test.ts tests/diagnose-flow.test.ts tests/diagnosis-status-ui.test.ts tests/phase3.3-decision.test.ts tests/generate-style-image.test.ts tests/uploaded-image.test.ts tests/color-card.test.ts",
     "test:all": "npm run test:offline"
   },
   "dependencies": {

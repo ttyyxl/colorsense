@@ -1,5 +1,6 @@
 import type { ProfileOutput } from "@/lib/ai";
 import type { UserStyleProfile } from "@/lib/user-profile-types";
+import type { ColorCardTestResult } from "@/lib/color-card";
 import { byUser, pgSelectOne, pgUpsert } from "./pg";
 
 const TABLE = "cs_users";
@@ -91,6 +92,26 @@ export async function saveUserProfile(
         promptContext,
       },
       updated_at: now,
+    },
+    { onConflict: "user_id" },
+  );
+}
+
+export async function saveColorCardTest(userId: string, result: ColorCardTestResult): Promise<void> {
+  const row = await getUserRow(userId);
+  if (!row || !row.profile) {
+    throw new Error("PROFILE_NOT_FOUND");
+  }
+
+  await pgUpsert(
+    TABLE,
+    {
+      user_id: userId,
+      profile: {
+        ...(row.profile as UserStyleProfile),
+        colorCardTest: result,
+      },
+      updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
   );
